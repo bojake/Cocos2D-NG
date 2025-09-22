@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36429.23
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CocosNG.Core", "CocosNG.Core\CocosNG.Core.csproj", "{99B2B1E0-B46E-439C-A61C-E56036A99BA1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CocosNG.Tests", "CocosNG.Tests\CocosNG.Tests.csproj", "{0D28DAFF-925D-41E5-BD0A-59BCD0B3DAFC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{99B2B1E0-B46E-439C-A61C-E56036A99BA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{99B2B1E0-B46E-439C-A61C-E56036A99BA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{99B2B1E0-B46E-439C-A61C-E56036A99BA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{99B2B1E0-B46E-439C-A61C-E56036A99BA1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0D28DAFF-925D-41E5-BD0A-59BCD0B3DAFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0D28DAFF-925D-41E5-BD0A-59BCD0B3DAFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0D28DAFF-925D-41E5-BD0A-59BCD0B3DAFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0D28DAFF-925D-41E5-BD0A-59BCD0B3DAFC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {301CB05C-8C55-49BE-B351-D9D1243AE34C}
+	EndGlobalSection
+EndGlobal
