@@ -5,6 +5,20 @@ namespace CocosNG.Core.Actions.Interval
 {
     public class CCSpawn : CCActionInterval
     {
+        public CCSpawn With(CCFiniteTimeAction action)
+        {
+            return new CCSpawn(this, action);
+        }
+
+        public CCSpawn With(params CCFiniteTimeAction[] actions)
+        {
+            if (actions == null || actions.Length == 0)
+            {
+                return this;
+            }
+            return new CCSpawn(this, new CCSpawn(actions));
+        }
+
         protected CCFiniteTimeAction m_pOne;
         protected CCFiniteTimeAction m_pTwo;
 

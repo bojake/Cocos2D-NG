@@ -7,7 +7,7 @@ using CocosNG.Core;
 
 namespace CocosNG.Core.Primitives
 {
-    public struct CCPoint
+    public struct CCPoint : Vector2
     {
         public static readonly CCPoint Zero = new CCPoint(0, 0);
 

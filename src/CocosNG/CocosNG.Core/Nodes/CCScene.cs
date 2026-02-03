@@ -34,5 +34,11 @@ namespace CocosNG.Core.Nodes
         {
             return (true);
         }
+
+        public CCScene WithContentSize(CCSize size)
+        {
+            ContentSize = size;
+            return this;
+        }
     }
 }

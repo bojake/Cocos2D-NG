@@ -58,5 +58,41 @@ namespace CocosNG.Core.UI
         {
             DisabledImage = new CCSprite(frame);
         }
+
+        public CCMenuItemImage WithNormalImage(string normalImage)
+        {
+            NormalImage = string.IsNullOrEmpty(normalImage) ? null : new CCSprite(normalImage);
+            return this;
+        }
+
+        public CCMenuItemImage WithSelectedImage(string selectedImage)
+        {
+            SelectedImage = string.IsNullOrEmpty(selectedImage) ? null : new CCSprite(selectedImage);
+            return this;
+        }
+
+        public CCMenuItemImage WithDisabledImage(string disabledImage)
+        {
+            DisabledImage = string.IsNullOrEmpty(disabledImage) ? null : new CCSprite(disabledImage);
+            return this;
+        }
+
+        public CCMenuItemImage WithNormalSpriteFrame(CCSpriteFrame frame)
+        {
+            SetNormalSpriteFrame(frame);
+            return this;
+        }
+
+        public CCMenuItemImage WithSelectedSpriteFrame(CCSpriteFrame frame)
+        {
+            SetSelectedSpriteFrame(frame);
+            return this;
+        }
+
+        public CCMenuItemImage WithDisabledSpriteFrame(CCSpriteFrame frame)
+        {
+            SetDisabledSpriteFrame(frame);
+            return this;
+        }
     }
 }

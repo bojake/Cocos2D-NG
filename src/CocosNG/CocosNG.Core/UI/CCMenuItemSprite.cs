@@ -34,6 +34,12 @@ namespace CocosNG.Core.UI
             }
         }
 
+        public CCMenuItemSprite WithNormalImage(CCNode image)
+        {
+            NormalImage = image;
+            return this;
+        }
+
         public CCNode SelectedImage
         {
             get { return m_pSelectedImage; }
@@ -56,6 +62,12 @@ namespace CocosNG.Core.UI
             }
         }
 
+        public CCMenuItemSprite WithSelectedImage(CCNode image)
+        {
+            SelectedImage = image;
+            return this;
+        }
+
         public CCNode DisabledImage
         {
             get { return m_pDisabledImage; }
@@ -76,6 +88,12 @@ namespace CocosNG.Core.UI
                 m_pDisabledImage = value;
                 UpdateImagesVisibility();
             }
+        }
+
+        public CCMenuItemSprite WithDisabledImage(CCNode image)
+        {
+            DisabledImage = image;
+            return this;
         }
 
         public override bool Enabled
@@ -135,6 +153,12 @@ namespace CocosNG.Core.UI
         /// Set this to true if you want to zoom-in/out on the button image like the CCMenuItemLabel works.
         /// </summary>
         public bool ZoomBehaviorOnTouch { get; set; }
+
+        public CCMenuItemSprite WithZoomBehaviorOnTouch(bool enabled)
+        {
+            ZoomBehaviorOnTouch = enabled;
+            return this;
+        }
 
         public override void Selected()
         {

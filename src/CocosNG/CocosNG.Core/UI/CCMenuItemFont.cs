@@ -47,6 +47,12 @@ namespace CocosNG.Core.UI
             get { return m_uFontSize; }
         }
 
+        public CCMenuItemFont WithItemFontSize(uint fontSize)
+        {
+            ItemFontSize = fontSize;
+            return this;
+        }
+
         /// <summary>
         /// Sets the name of the font for this item.
         /// </summary>
@@ -58,6 +64,12 @@ namespace CocosNG.Core.UI
                 RecreateLabel();
             }
             get { return m_strFontName; }
+        }
+
+        public CCMenuItemFont WithItemFontName(string fontName)
+        {
+            ItemFontName = fontName;
+            return this;
         }
 
         public override CCColor3B Color
@@ -101,6 +113,12 @@ namespace CocosNG.Core.UI
             CCLabelTTF label = new CCLabelTTF(value, m_strFontName, m_uFontSize);
             base.InitWithLabel(label, selector);
             return true;
+        }
+
+        public CCMenuItemFont WithText(string text)
+        {
+            SetString(text);
+            return this;
         }
 
         protected virtual void RecreateLabel()

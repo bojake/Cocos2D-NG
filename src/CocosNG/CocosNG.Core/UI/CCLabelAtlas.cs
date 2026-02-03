@@ -33,6 +33,12 @@ namespace CocosNG.Core.UI
             }
         }
 
+        public CCLabelAtlas WithText(string text)
+        {
+            Text = text;
+            return this;
+        }
+
         [Obsolete("Use Label Property")]
         public void SetString(string label)
         {
@@ -89,6 +95,12 @@ namespace CocosNG.Core.UI
                 return true;
             }
             return false;
+        }
+
+        public CCLabelAtlas WithCharMap(string label, string charMapFile, int itemWidth, int itemHeight, char startCharMap)
+        {
+            InitWithString(label, charMapFile, itemWidth, itemHeight, startCharMap);
+            return this;
         }
 
         public bool InitWithString(string label, CCTexture2D texture, int itemWidth, int itemHeight, char startCharMap)

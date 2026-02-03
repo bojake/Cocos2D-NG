@@ -16,6 +16,12 @@ namespace CocosNG.Core.Actions.Interval
             InitWithAnimation(pAnimation);
         }
 
+        public CCAnimate WithAnimation(CCAnimation animation)
+        {
+            InitWithAnimation(animation);
+            return this;
+        }
+
         protected CCAnimate(CCAnimate animate) : base(animate)
         {
             InitWithAnimation((CCAnimation) animate.m_pAnimation.Copy());

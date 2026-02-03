@@ -40,6 +40,12 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCProgressTimer WithType(CCProgressTimerType type)
+        {
+            Type = type;
+            return this;
+        }
+
         /** Percentages are from 0 to 100 */
 
         public float Percentage
@@ -53,6 +59,12 @@ namespace CocosNG.Core.Nodes
                     UpdateProgress();
                 }
             }
+        }
+
+        public CCProgressTimer WithPercentage(float percentage)
+        {
+            Percentage = percentage;
+            return this;
         }
 
         /** The image to show the progress percentage, retain */
@@ -77,6 +89,12 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCProgressTimer WithSprite(CCSprite sprite)
+        {
+            Sprite = sprite;
+            return this;
+        }
+
         /** Initializes a progress timer with the sprite as the shape the timer goes through */
 
         public bool ReverseProgress
@@ -94,6 +112,12 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCProgressTimer WithReverseProgress(bool reverse)
+        {
+            ReverseProgress = reverse;
+            return this;
+        }
+
         public CCPoint Midpoint
         {
             get { return m_tMidpoint; }
@@ -104,16 +128,34 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCProgressTimer WithMidpoint(CCPoint midpoint)
+        {
+            Midpoint = midpoint;
+            return this;
+        }
+
         public CCPoint BarChangeRate
         {
             get { return m_tBarChangeRate; }
             set { m_tBarChangeRate = value; }
         }
 
+        public CCProgressTimer WithBarChangeRate(CCPoint rate)
+        {
+            BarChangeRate = rate;
+            return this;
+        }
+
         public bool ReverseDirection
         {
             get { return m_bReverseDirection; }
             set { m_bReverseDirection = value; }
+        }
+
+        public CCProgressTimer WithReverseDirection(bool reverse)
+        {
+            ReverseDirection = reverse;
+            return this;
         }
 
         #region RGBA Protocol

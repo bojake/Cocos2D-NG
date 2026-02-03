@@ -155,6 +155,37 @@ namespace CocosNG.Core.UI
             }
         }
 
+        public CCLabelBMFont WithText(string text)
+        {
+            Text = text;
+            return this;
+        }
+
+        public CCLabelBMFont WithDimensions(CCSize dimensions)
+        {
+            Dimensions = dimensions;
+            return this;
+        }
+
+        public CCLabelBMFont WithAlignment(CCTextAlignment horizontal, CCVerticalTextAlignment vertical)
+        {
+            HorizontalAlignment = horizontal;
+            VerticalAlignment = vertical;
+            return this;
+        }
+
+        public CCLabelBMFont WithFontFile(string fntFile)
+        {
+            FntFile = fntFile;
+            return this;
+        }
+
+        public CCLabelBMFont WithLineBreakWithoutSpace(bool enabled)
+        {
+            LineBreakWithoutSpace = enabled;
+            return this;
+        }
+
         [Obsolete("Use Label Property")]
         public void SetString(string label)
         {

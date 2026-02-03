@@ -26,6 +26,12 @@ namespace CocosNG.Core.Nodes
             set { m_sBlendFunc = value; }
         }
 
+        public CCDrawNode WithBlendFunc(CCBlendFunc blendFunc)
+        {
+            BlendFunc = blendFunc;
+            return this;
+        }
+
         public override bool Init()
         {
             base.Init();
@@ -56,6 +62,12 @@ namespace CocosNG.Core.Nodes
             m_pVertices.Add(d);
 
             m_bDirty = true;
+        }
+
+        public CCDrawNode DrawDotAnd(CCPoint pos, float radius, CCColor4F color)
+        {
+            DrawDot(pos, radius, color);
+            return this;
         }
         
         /// <summary>
@@ -115,5 +127,11 @@ namespace CocosNG.Core.Nodes
 
             m_bDirty = true;
             return (returnIndex);
+        }
+
+        public CCDrawNode DrawSegmentAnd(CCPoint from, CCPoint to, float radius, CCColor4F color)
+        {
+            DrawSegment(from, to, radius, color);
+            return this;
         }
 }

@@ -87,10 +87,22 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_fDuration = value; }
         }
 
+        public CCParticleSystem WithDuration(float duration)
+        {
+            Duration = duration;
+            return this;
+        }
+
         public CCPoint SourcePosition
         {
             get { return m_tSourcePosition; }
             set { m_tSourcePosition = value; }
+        }
+
+        public CCParticleSystem WithSourcePosition(CCPoint position)
+        {
+            SourcePosition = position;
+            return this;
         }
 
         public CCPoint PosVar
@@ -99,10 +111,22 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_tPosVar = value; }
         }
 
+        public CCParticleSystem WithPosVar(CCPoint posVar)
+        {
+            PosVar = posVar;
+            return this;
+        }
+
         public float Life
         {
             get { return m_fLife; }
             set { m_fLife = value; }
+        }
+
+        public CCParticleSystem WithLife(float life)
+        {
+            Life = life;
+            return this;
         }
 
         public float LifeVar
@@ -111,10 +135,22 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_fLifeVar = value; }
         }
 
+        public CCParticleSystem WithLifeVar(float lifeVar)
+        {
+            LifeVar = lifeVar;
+            return this;
+        }
+
         public float Angle
         {
             get { return m_fAngle; }
             set { m_fAngle = value; }
+        }
+
+        public CCParticleSystem WithAngle(float angle)
+        {
+            Angle = angle;
+            return this;
         }
 
         public float AngleVar
@@ -123,10 +159,22 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_fAngleVar = value; }
         }
 
+        public CCParticleSystem WithAngleVar(float angleVar)
+        {
+            AngleVar = angleVar;
+            return this;
+        }
+
         public float StartSize
         {
             get { return m_fStartSize; }
             set { m_fStartSize = value; }
+        }
+
+        public CCParticleSystem WithStartSize(float startSize)
+        {
+            StartSize = startSize;
+            return this;
         }
 
         public float StartSizeVar
@@ -135,10 +183,22 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_fStartSizeVar = value; }
         }
 
+        public CCParticleSystem WithStartSizeVar(float startSizeVar)
+        {
+            StartSizeVar = startSizeVar;
+            return this;
+        }
+
         public float EndSize
         {
             get { return m_fEndSize; }
             set { m_fEndSize = value; }
+        }
+
+        public CCParticleSystem WithEndSize(float endSize)
+        {
+            EndSize = endSize;
+            return this;
         }
 
         public float EndSizeVar
@@ -147,10 +207,22 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_fEndSizeVar = value; }
         }
 
+        public CCParticleSystem WithEndSizeVar(float endSizeVar)
+        {
+            EndSizeVar = endSizeVar;
+            return this;
+        }
+
         public CCColor4F StartColor
         {
             get { return m_tStartColor; }
             set { m_tStartColor = value; }
+        }
+
+        public CCParticleSystem WithStartColor(CCColor4F color)
+        {
+            StartColor = color;
+            return this;
         }
 
         public CCColor4F StartColorVar
@@ -159,10 +231,22 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_tStartColorVar = value; }
         }
 
+        public CCParticleSystem WithStartColorVar(CCColor4F color)
+        {
+            StartColorVar = color;
+            return this;
+        }
+
         public CCColor4F EndColor
         {
             get { return m_tEndColor; }
             set { m_tEndColor = value; }
+        }
+
+        public CCParticleSystem WithEndColor(CCColor4F color)
+        {
+            EndColor = color;
+            return this;
         }
 
         public CCColor4F EndColorVar
@@ -171,10 +255,22 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_tEndColorVar = value; }
         }
 
+        public CCParticleSystem WithEndColorVar(CCColor4F color)
+        {
+            EndColorVar = color;
+            return this;
+        }
+
         public float StartSpin
         {
             get { return m_fStartSpin; }
             set { m_fStartSpin = value; }
+        }
+
+        public CCParticleSystem WithStartSpin(float spin)
+        {
+            StartSpin = spin;
+            return this;
         }
 
         public float StartSpinVar
@@ -183,10 +279,22 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_fStartSpinVar = value; }
         }
 
+        public CCParticleSystem WithStartSpinVar(float spinVar)
+        {
+            StartSpinVar = spinVar;
+            return this;
+        }
+
         public float EndSpin
         {
             get { return m_fEndSpin; }
             set { m_fEndSpin = value; }
+        }
+
+        public CCParticleSystem WithEndSpin(float spin)
+        {
+            EndSpin = spin;
+            return this;
         }
 
         public float EndSpinVar
@@ -195,10 +303,22 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_fEndSpinVar = value; }
         }
 
+        public CCParticleSystem WithEndSpinVar(float spinVar)
+        {
+            EndSpinVar = spinVar;
+            return this;
+        }
+
         public float EmissionRate
         {
             get { return m_fEmissionRate; }
             set { m_fEmissionRate = value; }
+        }
+
+        public CCParticleSystem WithEmissionRate(float rate)
+        {
+            EmissionRate = rate;
+            return this;
         }
 
         public virtual int TotalParticles
@@ -211,10 +331,22 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithTotalParticles(int total)
+        {
+            TotalParticles = total;
+            return this;
+        }
+
         public bool OpacityModifyRGB
         {
             get { return m_bOpacityModifyRGB; }
             set { m_bOpacityModifyRGB = value; }
+        }
+
+        public CCParticleSystem WithOpacityModifyRGB(bool enabled)
+        {
+            OpacityModifyRGB = enabled;
+            return this;
         }
 
         public CCPositionType PositionType
@@ -223,16 +355,34 @@ namespace CocosNG.Core.Nodes.Particles
             set { m_ePositionType = value; }
         }
 
+        public CCParticleSystem WithPositionType(CCPositionType positionType)
+        {
+            PositionType = positionType;
+            return this;
+        }
+
         public bool AutoRemoveOnFinish
         {
             get { return m_bIsAutoRemoveOnFinish; }
             set { m_bIsAutoRemoveOnFinish = value; }
         }
 
+        public CCParticleSystem WithAutoRemoveOnFinish(bool autoRemove)
+        {
+            AutoRemoveOnFinish = autoRemove;
+            return this;
+        }
+
         public CCEmitterMode EmitterMode
         {
             get { return m_nEmitterMode; }
             set { m_nEmitterMode = value; }
+        }
+
+        public CCParticleSystem WithEmitterMode(CCEmitterMode mode)
+        {
+            EmitterMode = mode;
+            return this;
         }
 
         public int AtlasIndex
@@ -262,6 +412,12 @@ namespace CocosNG.Core.Nodes.Particles
                     }
                 }
             }
+        }
+
+        public CCParticleSystem WithBatchNode(CCParticleBatchNode batchNode)
+        {
+            BatchNode = batchNode;
+            return this;
         }
 
         //don't use a transform matrix, this is faster
@@ -322,6 +478,12 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithBlendFunc(CCBlendFunc blendFunc)
+        {
+            BlendFunc = blendFunc;
+            return this;
+        }
+
         #endregion
 
         protected CCParticleSystem ()
@@ -358,6 +520,12 @@ namespace CocosNG.Core.Nodes.Particles
                 CCContentManager.SharedContentManager.SearchPaths.Remove(pathToRemove);
             }
             return (ret);
+        }
+
+        public CCParticleSystem WithFile(string plistFile)
+        {
+            InitWithFile(plistFile);
+            return this;
         }
 
         public bool InitWithDictionary(PlistDictionary dictionary)
@@ -1034,6 +1202,12 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithTexture(CCTexture2D texture)
+        {
+            Texture = texture;
+            return this;
+        }
+
         private void updateBlendFunc()
         {
             Debug.Assert(m_pBatchNode == null, "Can't change blending functions when the particle is being batched");
@@ -1085,6 +1259,12 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithBlendAdditive(bool additive)
+        {
+            BlendAdditive = additive;
+            return this;
+        }
+
         #endregion
 
         #region ParticleSystem - Properties of Gravity Mode
@@ -1103,6 +1283,12 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithTangentialAccel(float value)
+        {
+            TangentialAccel = value;
+            return this;
+        }
+
         public float TangentialAccelVar
         {
             get
@@ -1115,6 +1301,12 @@ namespace CocosNG.Core.Nodes.Particles
                 Debug.Assert(m_nEmitterMode == CCEmitterMode.Gravity, "Particle Mode should be Gravity");
                 modeA.tangentialAccelVar = value;
             }
+        }
+
+        public CCParticleSystem WithTangentialAccelVar(float value)
+        {
+            TangentialAccelVar = value;
+            return this;
         }
 
         public float RadialAccel
@@ -1131,6 +1323,12 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithRadialAccel(float value)
+        {
+            RadialAccel = value;
+            return this;
+        }
+
         public float RadialAccelVar
         {
             get
@@ -1143,6 +1341,12 @@ namespace CocosNG.Core.Nodes.Particles
                 Debug.Assert(m_nEmitterMode == CCEmitterMode.Gravity, "Particle Mode should be Gravity");
                 modeA.radialAccelVar = value;
             }
+        }
+
+        public CCParticleSystem WithRadialAccelVar(float value)
+        {
+            RadialAccelVar = value;
+            return this;
         }
 
         public bool RotationIsDir
@@ -1159,6 +1363,12 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithRotationIsDir(bool value)
+        {
+            RotationIsDir = value;
+            return this;
+        }
+
         public CCPoint Gravity
         {
             get
@@ -1171,6 +1381,12 @@ namespace CocosNG.Core.Nodes.Particles
                 Debug.Assert(m_nEmitterMode == CCEmitterMode.Gravity, "Particle Mode should be Gravity");
                 modeA.gravity = value;
             }
+        }
+
+        public CCParticleSystem WithGravity(CCPoint value)
+        {
+            Gravity = value;
+            return this;
         }
 
         public float Speed
@@ -1187,6 +1403,12 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithSpeed(float value)
+        {
+            Speed = value;
+            return this;
+        }
+
         public float SpeedVar
         {
             get
@@ -1199,6 +1421,12 @@ namespace CocosNG.Core.Nodes.Particles
                 Debug.Assert(m_nEmitterMode == CCEmitterMode.Gravity, "Particle Mode should be Gravity");
                 modeA.speedVar = value;
             }
+        }
+
+        public CCParticleSystem WithSpeedVar(float value)
+        {
+            SpeedVar = value;
+            return this;
         }
 
         #endregion
@@ -1219,6 +1447,12 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithStartRadius(float value)
+        {
+            StartRadius = value;
+            return this;
+        }
+
         public float StartRadiusVar
         {
             get
@@ -1231,6 +1465,12 @@ namespace CocosNG.Core.Nodes.Particles
                 Debug.Assert(m_nEmitterMode == CCEmitterMode.Radius, "Particle Mode should be Radius");
                 modeB.startRadiusVar = value;
             }
+        }
+
+        public CCParticleSystem WithStartRadiusVar(float value)
+        {
+            StartRadiusVar = value;
+            return this;
         }
 
         public float EndRadius
@@ -1247,6 +1487,12 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithEndRadius(float value)
+        {
+            EndRadius = value;
+            return this;
+        }
+
         public float EndRadiusVar
         {
             get
@@ -1259,6 +1505,12 @@ namespace CocosNG.Core.Nodes.Particles
                 Debug.Assert(m_nEmitterMode == CCEmitterMode.Radius, "Particle Mode should be Radius");
                 modeB.endRadiusVar = value;
             }
+        }
+
+        public CCParticleSystem WithEndRadiusVar(float value)
+        {
+            EndRadiusVar = value;
+            return this;
         }
 
         public float RotatePerSecond
@@ -1275,6 +1527,12 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleSystem WithRotatePerSecond(float value)
+        {
+            RotatePerSecond = value;
+            return this;
+        }
+
         public float RotatePerSecondVar
         {
             get
@@ -1287,6 +1545,12 @@ namespace CocosNG.Core.Nodes.Particles
                 Debug.Assert(m_nEmitterMode == CCEmitterMode.Radius, "Particle Mode should be Radius");
                 modeB.rotatePerSecondVar = value;
             }
+        }
+
+        public CCParticleSystem WithRotatePerSecondVar(float value)
+        {
+            RotatePerSecondVar = value;
+            return this;
         }
 
         #endregion

@@ -16,16 +16,34 @@ namespace CocosNG.Core.Nodes
             set { m_bInverted = value; }
         }
 
+        public CCClippingNode WithInverted(bool inverted)
+        {
+            Inverted = inverted;
+            return this;
+        }
+
         public CCNode Stencil
         {
             get { return m_pStencil; }
             set { m_pStencil = value; }
         }
 
+        public CCClippingNode WithStencil(CCNode stencil)
+        {
+            Stencil = stencil;
+            return this;
+        }
+
         public float AlphaThreshold
         {
             get { return m_fAlphaThreshold; }
             set { m_fAlphaThreshold = value; }
+        }
+
+        public CCClippingNode WithAlphaThreshold(float alphaThreshold)
+        {
+            AlphaThreshold = alphaThreshold;
+            return this;
         }
 
         public CCClippingNode()

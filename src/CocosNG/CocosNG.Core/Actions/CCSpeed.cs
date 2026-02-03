@@ -52,6 +52,24 @@ namespace CocosNG.Core.Actions
             set { m_fSpeed = value; }
         }
 
+        public CCSpeed WithSpeed(float speed)
+        {
+            Speed = speed;
+            return this;
+        }
+
+        public CCSpeed WithAction(CCActionInterval action, float speed)
+        {
+            InitWithAction(action, speed);
+            return this;
+        }
+
+        public CCSpeed WithInnerAction(CCActionInterval action)
+        {
+            InitWithAction(action, m_fSpeed);
+            return this;
+        }
+
         protected internal override void StartWithTarget(CCNode target)
         {
             base.StartWithTarget(target);

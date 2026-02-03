@@ -4,7 +4,7 @@ using CocosNG.Core.Nodes;
 
 namespace CocosNG.Core.Actions
 {
-    public class CCActionManager : ICCSelectorProtocol
+    public class CCActionManager : ISchedulerTarget
     {
         private static CCNode[] m_pTmpKeysArray = new CCNode[128];
         private bool m_bCurrentTargetSalvaged;

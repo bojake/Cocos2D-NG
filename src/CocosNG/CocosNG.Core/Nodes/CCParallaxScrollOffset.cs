@@ -16,6 +16,48 @@ namespace CocosNG.Core.Nodes
         public CCPoint CurrentPosition { get; set; }
         public CCNode Child { get; set; }
 
+        public CCParallaxScrollOffset WithOffset(CCPoint offset)
+        {
+            Offset = offset;
+            return this;
+        }
+
+        public CCParallaxScrollOffset WithOriginalPosition(CCPoint position)
+        {
+            OriginalPosition = position;
+            return this;
+        }
+
+        public CCParallaxScrollOffset WithRelativeVelocity(CCPoint velocity)
+        {
+            RelativeVelocity = velocity;
+            return this;
+        }
+
+        public CCParallaxScrollOffset WithRatio(CCPoint ratio)
+        {
+            Ratio = ratio;
+            return this;
+        }
+
+        public CCParallaxScrollOffset WithPosition(CCPoint position)
+        {
+            Position = position;
+            return this;
+        }
+
+        public CCParallaxScrollOffset WithCurrentPosition(CCPoint position)
+        {
+            CurrentPosition = position;
+            return this;
+        }
+
+        public CCParallaxScrollOffset WithChild(CCNode child)
+        {
+            Child = child;
+            return this;
+        }
+
         public CCParallaxScrollOffset(CCNode node, CCPoint r, CCPoint p, CCPoint s)
             : this(node, r, p, s, CCPoint.Zero)
         {

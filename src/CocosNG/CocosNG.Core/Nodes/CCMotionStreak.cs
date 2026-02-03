@@ -77,10 +77,22 @@ namespace CocosNG.Core.Nodes
             set { m_pTexture = value; }
         }
 
+        public CCMotionStreak WithTexture(CCTexture2D texture)
+        {
+            Texture = texture;
+            return this;
+        }
+
         public CCBlendFunc BlendFunc
         {
             set { m_tBlendFunc = value; }
             get { return (m_tBlendFunc); }
+        }
+
+        public CCMotionStreak WithBlendFunc(CCBlendFunc blendFunc)
+        {
+            BlendFunc = blendFunc;
+            return this;
         }
 
         #endregion
@@ -91,10 +103,22 @@ namespace CocosNG.Core.Nodes
             set { m_bFastMode = value; }
         }
 
+        public CCMotionStreak WithFastMode(bool fastMode)
+        {
+            FastMode = fastMode;
+            return this;
+        }
+
         public bool StartingPositionInitialized
         {
             get { return m_bStartingPositionInitialized; }
             set { m_bStartingPositionInitialized = value; }
+        }
+
+        public CCMotionStreak WithStartingPositionInitialized(bool initialized)
+        {
+            StartingPositionInitialized = initialized;
+            return this;
         }
 
         protected virtual bool InitWithFade(float fade, float minSeg, float stroke, CCColor3B color, string path)
@@ -103,6 +127,12 @@ namespace CocosNG.Core.Nodes
 
             CCTexture2D texture = CCTextureCache.SharedTextureCache.AddImage(path);
             return InitWithFade(fade, minSeg, stroke, color, texture);
+        }
+
+        public CCMotionStreak WithFade(float fade, float minSegLength, float streakWidth, CCColor3B color, string pathToTexture)
+        {
+            InitWithFade(fade, minSegLength, streakWidth, color, pathToTexture);
+            return this;
         }
 
         protected virtual bool InitWithFade(float fade, float minSeg, float stroke, CCColor3B color, CCTexture2D texture)
@@ -135,6 +165,18 @@ namespace CocosNG.Core.Nodes
             ScheduleUpdate();
 
             return true;
+        }
+
+        public CCMotionStreak WithFade(float fade, float minSegLength, float streakWidth, CCColor3B color, CCTexture2D texture)
+        {
+            InitWithFade(fade, minSegLength, streakWidth, color, texture);
+            return this;
+        }
+
+        public CCMotionStreak WithPosition(CCPoint position)
+        {
+            Position = position;
+            return this;
         }
 
         public void TintWithColor(CCColor3B colors)

@@ -70,6 +70,25 @@ namespace CocosNG.Core.UI
             }
         }
 
+        public CCLabelTTF WithFont(string fontName, float fontSize)
+        {
+            FontName = fontName;
+            FontSize = fontSize;
+            return this;
+        }
+
+        public CCLabelTTF WithFontName(string fontName)
+        {
+            FontName = fontName;
+            return this;
+        }
+
+        public CCLabelTTF WithFontSize(float fontSize)
+        {
+            FontSize = fontSize;
+            return this;
+        }
+
         public CCSize Dimensions
         {
             get { return m_tDimensions; }
@@ -84,6 +103,12 @@ namespace CocosNG.Core.UI
                     }
                 }
             }
+        }
+
+        public CCLabelTTF WithDimensions(CCSize dimensions)
+        {
+            Dimensions = dimensions;
+            return this;
         }
 
         public CCVerticalTextAlignment VerticalAlignment
@@ -102,6 +127,12 @@ namespace CocosNG.Core.UI
             }
         }
 
+        public CCLabelTTF WithVerticalAlignment(CCVerticalTextAlignment alignment)
+        {
+            VerticalAlignment = alignment;
+            return this;
+        }
+
         public CCTextAlignment HorizontalAlignment
         {
             get { return m_hAlignment; }
@@ -117,6 +148,19 @@ namespace CocosNG.Core.UI
                 }
                     }
                 }
+
+        public CCLabelTTF WithHorizontalAlignment(CCTextAlignment alignment)
+        {
+            HorizontalAlignment = alignment;
+            return this;
+        }
+
+        public CCLabelTTF WithAlignment(CCTextAlignment horizontal, CCVerticalTextAlignment vertical)
+        {
+            HorizontalAlignment = horizontal;
+            VerticalAlignment = vertical;
+            return this;
+        }
 
         internal void Refresh()
         {
@@ -163,6 +207,12 @@ namespace CocosNG.Core.UI
                 }
                 //            Dirty = true;
             }
+        }
+
+        public CCLabelTTF WithText(string text)
+        {
+            Text = text;
+            return this;
         }
 
         [Obsolete("Use Text Property")]

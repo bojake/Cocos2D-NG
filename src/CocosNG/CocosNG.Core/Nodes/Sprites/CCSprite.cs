@@ -295,6 +295,48 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSprite WithFlipX(bool flipX)
+        {
+            FlipX = flipX;
+            return this;
+        }
+
+        public CCSprite WithFlipY(bool flipY)
+        {
+            FlipY = flipY;
+            return this;
+        }
+
+        public CCSprite WithTexture(CCTexture2D texture)
+        {
+            Texture = texture;
+            return this;
+        }
+
+        public CCSprite WithTextureRect(CCRect rect)
+        {
+            TextureRect = rect;
+            return this;
+        }
+
+        public CCSprite WithDisplayFrame(CCSpriteFrame frame)
+        {
+            DisplayFrame = frame;
+            return this;
+        }
+
+        public CCSprite WithScaleTo(CCSize size)
+        {
+            ScaleTo(size);
+            return this;
+        }
+
+        public CCSprite WithTextureFile(string fileName)
+        {
+            InitWithFile(fileName);
+            return this;
+        }
+
         public CCSpriteFrame DisplayFrame
         {
             get

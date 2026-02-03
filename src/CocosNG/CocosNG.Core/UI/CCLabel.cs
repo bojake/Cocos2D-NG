@@ -56,6 +56,25 @@ namespace CocosNG.Core.UI
             }
         }
 
+        public CCLabel WithFont(string fontName, float fontSize)
+        {
+            FontName = fontName;
+            FontSize = fontSize;
+            return this;
+        }
+
+        public CCLabel WithFontName(string fontName)
+        {
+            FontName = fontName;
+            return this;
+        }
+
+        public CCLabel WithFontSize(float fontSize)
+        {
+            FontSize = fontSize;
+            return this;
+        }
+
         public static void InitializeTTFAtlas(int width, int height)
         {
             m_nWidth = width;

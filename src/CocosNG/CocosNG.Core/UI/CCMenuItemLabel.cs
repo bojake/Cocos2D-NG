@@ -26,6 +26,12 @@ namespace CocosNG.Core.UI
             set { m_tDisabledColor = value; }
         }
 
+        public CCMenuItemLabel WithDisabledColor(CCColor3B color)
+        {
+            DisabledColor = color;
+            return this;
+        }
+
         public CCNode Label
         {
             get { return m_pLabel; }
@@ -45,6 +51,12 @@ namespace CocosNG.Core.UI
 
                 m_pLabel = value;
             }
+        }
+
+        public CCMenuItemLabel WithLabel(CCNode label)
+        {
+            Label = label;
+            return this;
         }
 
         public override bool Enabled
@@ -86,6 +98,12 @@ namespace CocosNG.Core.UI
         {
             (m_pLabel as ICCLabelProtocol).Text = (label);
             ContentSize = m_pLabel.ContentSize;
+        }
+
+        public CCMenuItemLabel WithText(string text)
+        {
+            SetString(text);
+            return this;
         }
 
         public override void Activate()

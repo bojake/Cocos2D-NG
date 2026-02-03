@@ -81,7 +81,7 @@ namespace CocosNG.Core.UI
         /// <summary>
         /// Activate the item
         /// </summary>
-        public virtual void Activate()
+        public virtual CCMenuItem Activate()
         {
             if (m_bIsEnabled)
             {
@@ -97,26 +97,29 @@ namespace CocosNG.Core.UI
                 //CCScriptEngineManager.sharedScriptEngineManager().getScriptEngine().executeCallFuncN(m_functionName.c_str(), this);
                 //}
             }
+            return this;
         }
 
         /// <summary>
         /// The item was selected (not activated), similar to "mouse-over"
         /// </summary>
-        public virtual void Selected()
+        public virtual CCMenuItem Selected()
         {
             m_bIsSelected = true;
             if(OnSelected != null)
             OnSelected(this);
+            return this;
         }
 
         /// <summary>
         /// The item was unselected
         /// </summary>
-        public virtual void Unselected()
+        public virtual CCMenuItem Unselected()
         {
             m_bIsSelected = false;
             if(OnUnselected!=null)
             OnUnselected(this);
+            return this;
         }
 
         /// <summary>
@@ -134,9 +137,40 @@ namespace CocosNG.Core.UI
         /// item lifecycle.
         /// </summary>
         /// <param name="selector"></param>
-        public virtual void SetTarget(Action<CCMenuItem> selector)
+        public virtual CCMenuItem SetTarget(Action<CCMenuItem> selector)
         {
             m_pfnSelector = selector;
+            return this;
+        }
+
+        public CCMenuItem WithEnabled(bool enabled)
+        {
+            Enabled = enabled;
+            return this;
+        }
+
+        public CCMenuItem WithTarget(Action<CCMenuItem> selector)
+        {
+            SetTarget(selector);
+            return this;
+        }
+
+        public CCMenuItem OnActivatedDo(Action<CCMenuItem> handler)
+        {
+            OnActivated += handler;
+            return this;
+        }
+
+        public CCMenuItem OnSelectedDo(Action<CCMenuItem> handler)
+        {
+            OnSelected += handler;
+            return this;
+        }
+
+        public CCMenuItem OnUnselectedDo(Action<CCMenuItem> handler)
+        {
+            OnUnselected += handler;
+            return this;
         }
     }
 }

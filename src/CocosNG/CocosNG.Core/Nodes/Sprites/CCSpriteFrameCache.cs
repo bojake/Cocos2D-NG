@@ -22,6 +22,12 @@ namespace CocosNG.Core.Nodes.Sprites
             return true;
         }
 
+        public CCSpriteFrameCache InitAnd()
+        {
+            Init();
+            return this;
+        }
+
         /// <summary>
         /// When false, an exception is thrown if an animation frame is overwritten.
         /// </summary>
@@ -35,6 +41,12 @@ namespace CocosNG.Core.Nodes.Sprites
             {
                 _AllowFrameOverwrite = value;
             }
+        }
+
+        public CCSpriteFrameCache WithAllowFrameOverwrite(bool allow)
+        {
+            AllowFrameOverrite = allow;
+            return this;
         }
 
         public void AddSpriteFramesWithDictionary(PlistDictionary pobDictionary, CCTexture2D pobTexture)
@@ -188,6 +200,12 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSpriteFrameCache AddSpriteFramesWithDictionaryAnd(PlistDictionary dictionary, CCTexture2D texture)
+        {
+            AddSpriteFramesWithDictionary(dictionary, texture);
+            return this;
+        }
+
         public void AddSpriteFramesWithFile(string pszPlist)
         {
             PlistDocument document = CCContentManager.SharedContentManager.Load<PlistDocument>(pszPlist);
@@ -236,6 +254,12 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSpriteFrameCache AddSpriteFramesWithFileAnd(string plist)
+        {
+            AddSpriteFramesWithFile(plist);
+            return this;
+        }
+
         public void AddSpriteFramesWithFile(string plist, string textureFileName)
         {
             Debug.Assert(textureFileName != null);
@@ -250,6 +274,12 @@ namespace CocosNG.Core.Nodes.Sprites
             {
                 CCLog.Log("cocos2d: CCSpriteFrameCache: couldn't load texture file. File not found {0}", textureFileName);
             }
+        }
+
+        public CCSpriteFrameCache AddSpriteFramesWithFileAnd(string plist, string textureFileName)
+        {
+            AddSpriteFramesWithFile(plist, textureFileName);
+            return this;
         }
 
         public void AddSpriteFramesWithFile(Stream plist, CCTexture2D pobTexture)
@@ -269,6 +299,12 @@ namespace CocosNG.Core.Nodes.Sprites
             AddSpriteFramesWithDictionary(dict, pobTexture);
         }
 
+        public CCSpriteFrameCache AddSpriteFramesWithFileAnd(Stream plist, CCTexture2D texture)
+        {
+            AddSpriteFramesWithFile(plist, texture);
+            return this;
+        }
+
         public void AddSpriteFramesWithFile(string pszPlist, CCTexture2D pobTexture)
         {
             PlistDocument document = CCContentManager.SharedContentManager.Load<PlistDocument>(pszPlist);
@@ -276,6 +312,12 @@ namespace CocosNG.Core.Nodes.Sprites
             PlistDictionary dict = document.Root.AsDictionary;
 
             AddSpriteFramesWithDictionary(dict, pobTexture);
+        }
+
+        public CCSpriteFrameCache AddSpriteFramesWithFileAnd(string plist, CCTexture2D texture)
+        {
+            AddSpriteFramesWithFile(plist, texture);
+            return this;
         }
 
         public void AddSpriteFrame(CCSpriteFrame pobFrame, string pszFrameName)
@@ -287,10 +329,22 @@ namespace CocosNG.Core.Nodes.Sprites
             m_pSpriteFrames[pszFrameName] = pobFrame;
         }
 
+        public CCSpriteFrameCache AddSpriteFrameAnd(CCSpriteFrame frame, string frameName)
+        {
+            AddSpriteFrame(frame, frameName);
+            return this;
+        }
+
         public void RemoveSpriteFrames()
         {
             m_pSpriteFrames.Clear();
             m_pSpriteFramesAliases.Clear();
+        }
+
+        public CCSpriteFrameCache RemoveSpriteFramesAnd()
+        {
+            RemoveSpriteFrames();
+            return this;
         }
 
         public void RemoveUnusedSpriteFrames()
@@ -318,6 +372,12 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSpriteFrameCache RemoveUnusedSpriteFramesAnd()
+        {
+            RemoveUnusedSpriteFrames();
+            return this;
+        }
+
         public void RemoveSpriteFrameByName(string pszName)
         {
             // explicit nil handling
@@ -340,6 +400,12 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSpriteFrameCache RemoveSpriteFrameByNameAnd(string name)
+        {
+            RemoveSpriteFrameByName(name);
+            return this;
+        }
+
         public void RemoveSpriteFramesFromFile(string plist)
         {
             PlistDocument document = CCContentManager.SharedContentManager.Load<PlistDocument>(plist);
@@ -347,6 +413,12 @@ namespace CocosNG.Core.Nodes.Sprites
             PlistDictionary dict = document.Root.AsDictionary;
 
             RemoveSpriteFramesFromDictionary(dict);
+        }
+
+        public CCSpriteFrameCache RemoveSpriteFramesFromFileAnd(string plist)
+        {
+            RemoveSpriteFramesFromFile(plist);
+            return this;
         }
 
         public void RemoveSpriteFramesFromDictionary(PlistDictionary dictionary)
@@ -368,6 +440,12 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSpriteFrameCache RemoveSpriteFramesFromDictionaryAnd(PlistDictionary dictionary)
+        {
+            RemoveSpriteFramesFromDictionary(dictionary);
+            return this;
+        }
+
         public void RemoveSpriteFramesFromTexture(CCTexture2D texture)
         {
             var keysToRemove = new List<string>();
@@ -385,6 +463,12 @@ namespace CocosNG.Core.Nodes.Sprites
             {
                 m_pSpriteFrames.Remove(key);
             }
+        }
+
+        public CCSpriteFrameCache RemoveSpriteFramesFromTextureAnd(CCTexture2D texture)
+        {
+            RemoveSpriteFramesFromTexture(texture);
+            return this;
         }
 
         /// <summary>

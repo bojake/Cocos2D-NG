@@ -44,6 +44,12 @@ namespace CocosNG.Core.Nodes.Sprites
             return result;
         }
 
+        public CCSpriteSheetCache AddSpriteSheetAnd(string fileName)
+        {
+            AddSpriteSheet(fileName);
+            return this;
+        }
+
         public CCSpriteSheet AddSpriteSheet(string fileName, string textureFileName)
         {
             CCSpriteSheet result;
@@ -53,6 +59,12 @@ namespace CocosNG.Core.Nodes.Sprites
                 _spriteSheets.Add(fileName, result);
             }
             return result;
+        }
+
+        public CCSpriteSheetCache AddSpriteSheetAnd(string fileName, string textureFileName)
+        {
+            AddSpriteSheet(fileName, textureFileName);
+            return this;
         }
 
         public CCSpriteSheet AddSpriteSheet(string fileName, CCTexture2D texture)
@@ -66,6 +78,12 @@ namespace CocosNG.Core.Nodes.Sprites
             return result;
         }
 
+        public CCSpriteSheetCache AddSpriteSheetAnd(string fileName, CCTexture2D texture)
+        {
+            AddSpriteSheet(fileName, texture);
+            return this;
+        }
+
         public CCSpriteSheet AddSpriteSheet(Stream stream, CCTexture2D texture, string name)
         {
             CCSpriteSheet result;
@@ -77,6 +95,12 @@ namespace CocosNG.Core.Nodes.Sprites
             return result;
         }
 
+        public CCSpriteSheetCache AddSpriteSheetAnd(Stream stream, CCTexture2D texture, string name)
+        {
+            AddSpriteSheet(stream, texture, name);
+            return this;
+        }
+
         public CCSpriteSheet AddSpriteSheet(PlistDictionary dictionary, CCTexture2D texture, string name)
         {
             CCSpriteSheet result;
@@ -86,6 +110,12 @@ namespace CocosNG.Core.Nodes.Sprites
                 _spriteSheets.Add(name, result);
             }
             return result;
+        }
+
+        public CCSpriteSheetCache AddSpriteSheetAnd(PlistDictionary dictionary, CCTexture2D texture, string name)
+        {
+            AddSpriteSheet(dictionary, texture, name);
+            return this;
         }
 
         public CCSpriteSheet SpriteSheetForKey(string name)
@@ -101,6 +131,12 @@ namespace CocosNG.Core.Nodes.Sprites
         public void RemoveAll()
         {
             _spriteSheets.Clear();
+        }
+
+        public CCSpriteSheetCache RemoveAllAnd()
+        {
+            RemoveAll();
+            return this;
         }
 
         public void RemoveUnused()
@@ -128,6 +164,12 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSpriteSheetCache RemoveUnusedAnd()
+        {
+            RemoveUnused();
+            return this;
+        }
+
         public void Remove(CCSpriteSheet spriteSheet)
         {
             if (spriteSheet == null)
@@ -152,6 +194,12 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSpriteSheetCache RemoveAnd(CCSpriteSheet spriteSheet)
+        {
+            Remove(spriteSheet);
+            return this;
+        }
+
         public void Remove(string name)
         {
             if (name == null)
@@ -159,6 +207,12 @@ namespace CocosNG.Core.Nodes.Sprites
                 return;
             }
             _spriteSheets.Remove(name);
+        }
+
+        public CCSpriteSheetCache RemoveAnd(string name)
+        {
+            Remove(name);
+            return this;
         }
 
     }

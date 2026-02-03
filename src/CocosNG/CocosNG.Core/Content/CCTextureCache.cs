@@ -1,19 +1,23 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Xna.Framework.Graphics;
 using CocosNG.Core;
 
 namespace CocosNG.Core.Content
 {
-    public partial class CCTextureCache : IDisposable, ICCSelectorProtocol
+    public partial class CCTextureCache : IDisposable, ISchedulerTarget
     {
         struct AsyncStruct
         {
             public string  FileName;
             public Action<CCTexture2D> Action;
+            public TaskCompletionSource<CCTexture2D> Completion;
+            public CancellationToken CancellationToken;
         };
 
         private List<AsyncStruct> _asyncLoadedImages = new List<AsyncStruct>();
@@ -50,21 +54,45 @@ namespace CocosNG.Core.Content
                             _asyncLoadedImages.RemoveAt(0);
                         }
 
+                        if (image.CancellationToken.IsCancellationRequested)
+                        {
+                            if (image.Completion != null)
+                            {
+                                image.Completion.TrySetCanceled();
+                            }
+                            continue;
+                        }
+
                         try
                         {
                             var texture = AddImage(image.FileName);
 						CCLog.Log("Loaded texture: {0}", image.FileName);
-                            if (image.Action != null)
+                            if (!image.CancellationToken.IsCancellationRequested && image.Action != null)
                             {
                                 CCDirector.SharedDirector.Scheduler.ScheduleSelector(
                                     f => image.Action(texture), this, 0, 0, 0, false
                                     );
+                            }
+                            if (image.Completion != null)
+                            {
+                                if (image.CancellationToken.IsCancellationRequested)
+                                {
+                                    image.Completion.TrySetCanceled();
+                                }
+                                else
+                                {
+                                    image.Completion.TrySetResult(texture);
+                                }
                             }
                         }
                         catch (Exception ex)
                         {
 						    CCLog.Log("Failed to load image {0}", image.FileName);
                             CCLog.Log(ex.ToString());
+                            if (image.Completion != null)
+                            {
+                                image.Completion.TrySetException(ex);
+                            }
                         }
                     }
                 }
@@ -96,9 +124,10 @@ namespace CocosNG.Core.Content
             }
         }
 
-        public void UnloadContent()
+        public CCTextureCache UnloadContent()
         {
             m_pTextures.Clear();
+            return this;
         }
 
         public bool Contains(string assetFile)
@@ -106,19 +135,99 @@ namespace CocosNG.Core.Content
             return m_pTextures.ContainsKey(assetFile);
         }
 
-        public void AddImageAsync(string fileimage, Action<CCTexture2D> action)
+        public Task<CCTexture2D> AddImageAsync(string fileimage, Action<CCTexture2D> action)
         {
             Debug.Assert(!String.IsNullOrEmpty(fileimage), "TextureCache: fileimage MUST not be NULL");
 
+            var tcs = new TaskCompletionSource<CCTexture2D>(this);
             lock (_asyncLoadedImages)
             {
-                _asyncLoadedImages.Add(new AsyncStruct() {FileName = fileimage, Action = action});
+                _asyncLoadedImages.Add(new AsyncStruct() {FileName = fileimage, Action = action, Completion = tcs});
             }
 
             if (_task == null)
             {
                 _task = CCTask.RunAsync(_processingAction);
             }
+            return tcs.Task;
+        }
+
+        public Task<CCTexture2D> AddImageAsync(string fileimage)
+        {
+            Debug.Assert(!String.IsNullOrEmpty(fileimage), "TextureCache: fileimage MUST not be NULL");
+
+            var tcs = new TaskCompletionSource<CCTexture2D>(this);
+
+            lock (_asyncLoadedImages)
+            {
+                _asyncLoadedImages.Add(new AsyncStruct() {FileName = fileimage, Completion = tcs});
+            }
+
+            if (_task == null)
+            {
+                _task = CCTask.RunAsync(_processingAction);
+            }
+
+            return tcs.Task;
+        }
+
+        public Task<CCTexture2D> AddImageAsync(string fileimage, CancellationToken cancellationToken)
+        {
+            Debug.Assert(!String.IsNullOrEmpty(fileimage), "TextureCache: fileimage MUST not be NULL");
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<CCTexture2D>(cancellationToken);
+            }
+
+            var tcs = new TaskCompletionSource<CCTexture2D>(this);
+
+            lock (_asyncLoadedImages)
+            {
+                _asyncLoadedImages.Add(new AsyncStruct()
+                {
+                    FileName = fileimage,
+                    Completion = tcs,
+                    CancellationToken = cancellationToken
+                });
+            }
+
+            if (_task == null)
+            {
+                _task = CCTask.RunAsync(_processingAction);
+            }
+
+            return tcs.Task;
+        }
+
+        public Task<CCTexture2D> AddImageAsync(string fileimage, Action<CCTexture2D> action, CancellationToken cancellationToken)
+        {
+            Debug.Assert(!String.IsNullOrEmpty(fileimage), "TextureCache: fileimage MUST not be NULL");
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<CCTexture2D>(cancellationToken);
+            }
+
+            var tcs = new TaskCompletionSource<CCTexture2D>(this);
+
+            lock (_asyncLoadedImages)
+            {
+                _asyncLoadedImages.Add(new AsyncStruct()
+                {
+                    FileName = fileimage,
+                    Action = action,
+                    Completion = tcs,
+                    CancellationToken = cancellationToken
+                });
+            }
+
+            if (_task == null)
+            {
+                _task = CCTask.RunAsync(_processingAction);
+            }
+
+            return tcs.Task;
         }
 
         /// <summary>

@@ -40,6 +40,12 @@ namespace CocosNG.Core.UI
             }
         }
 
+        public CCMenuItemToggle WithSelectedIndex(int index)
+        {
+            SelectedIndex = index;
+            return this;
+        }
+
         public List<CCMenuItem> SubItems
         {
             get { return m_pSubItems; }
@@ -142,6 +148,18 @@ namespace CocosNG.Core.UI
         /// </summary>
         public bool ZoomBehaviorOnTouch { get; set; }
         private float m_fOriginalScale = 0f;
+
+        public CCMenuItemToggle WithZoomBehaviorOnTouch(bool enabled)
+        {
+            ZoomBehaviorOnTouch = enabled;
+            return this;
+        }
+
+        public CCMenuItemToggle WithItems(params CCMenuItem[] items)
+        {
+            InitWithTarget(null, items);
+            return this;
+        }
 
         public override void Selected()
         {

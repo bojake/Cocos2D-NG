@@ -37,6 +37,12 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCNodeRGBA WithColor(CCColor3B color)
+        {
+            Color = color;
+            return this;
+        }
+
         public virtual CCColor3B DisplayedColor
         {
             get { return _displayedColor; }
@@ -62,6 +68,12 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCNodeRGBA WithOpacity(byte opacity)
+        {
+            Opacity = opacity;
+            return this;
+        }
+
         public virtual byte DisplayedOpacity
         {
             get { return _displayedOpacity; }
@@ -73,16 +85,34 @@ namespace CocosNG.Core.Nodes
             set { }
         }
 
+        public CCNodeRGBA WithOpacityModifyRGB(bool enabled)
+        {
+            IsOpacityModifyRGB = enabled;
+            return this;
+        }
+
         public virtual bool CascadeColorEnabled
         {
             get { return _cascadeColorEnabled; }
             set { _cascadeColorEnabled = value; }
         }
 
+        public CCNodeRGBA WithCascadeColorEnabled(bool enabled)
+        {
+            CascadeColorEnabled = enabled;
+            return this;
+        }
+
         public virtual bool CascadeOpacityEnabled
         {
             get { return _cascadeOpacityEnabled; }
             set { _cascadeOpacityEnabled = value; }
+        }
+
+        public CCNodeRGBA WithCascadeOpacityEnabled(bool enabled)
+        {
+            CascadeOpacityEnabled = enabled;
+            return this;
         }
 
         public CCNodeRGBA()

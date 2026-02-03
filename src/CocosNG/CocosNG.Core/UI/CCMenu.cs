@@ -118,6 +118,12 @@ namespace CocosNG.Core.UI
             set { m_bEnabled = value; }
         }
 
+        public CCMenu WithEnabled(bool enabled)
+        {
+            Enabled = enabled;
+            return this;
+        }
+
         public override bool Init()
         {
             return InitWithArray(null);
@@ -205,6 +211,23 @@ namespace CocosNG.Core.UI
             {
                 _Items.AddLast(child as CCMenuItem);
             }
+        }
+
+        public CCMenu AddItems(params CCMenuItem[] items)
+        {
+            if (items == null)
+            {
+                return this;
+            }
+
+            int z = _Items.Count;
+            foreach (var item in items)
+            {
+                AddChild(item, z);
+                z++;
+            }
+
+            return this;
         }
 
         public override void RemoveChild(CCNode child, bool cleanup)

@@ -24,6 +24,12 @@ namespace CocosNG.Core.Nodes
         /// </summary>
         public float PTMRatio { get; set; }
 
+        public CCParallaxScrollNode WithPTMRatio(float ratio)
+        {
+            PTMRatio = ratio;
+            return this;
+        }
+
         /// <summary>
         /// Scrolling node with no sprite batch support.
         /// </summary>
@@ -83,6 +89,18 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCParallaxScrollNode AddChildAnd(CCSprite node, int z, CCPoint r, CCPoint p, CCPoint s)
+        {
+            AddChild(node, z, r, p, s);
+            return this;
+        }
+
+        public CCParallaxScrollNode AddChildAnd(CCSprite node, int z, CCPoint r, CCPoint p, CCPoint s, CCPoint v)
+        {
+            AddChild(node, z, r, p, s, v);
+            return this;
+        }
+
         public void RemoveChild(CCSprite node, bool cleanup)
         {
             int removeAt = -1;
@@ -103,6 +121,12 @@ namespace CocosNG.Core.Nodes
             {
                 m_Batch.RemoveChild(node, cleanup);
             }
+        }
+
+        public CCParallaxScrollNode RemoveChildAnd(CCSprite node, bool cleanup)
+        {
+            RemoveChild(node, cleanup);
+            return this;
         }
         public override void RemoveAllChildrenWithCleanup(bool cleanup)
         {
@@ -151,6 +175,12 @@ namespace CocosNG.Core.Nodes
                 }
             }
         }
+
+        public CCParallaxScrollNode UpdateWithVelocityAnd(CCPoint vel, float dt)
+        {
+            UpdateWithVelocity(vel, dt);
+            return this;
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -166,6 +196,12 @@ namespace CocosNG.Core.Nodes
                 child.Position = new CCPoint(child.Position.X, scrollOffset.OriginalPosition.Y + offset);
             }
         }
+
+        public CCParallaxScrollNode UpdateWithYPositionAnd(float y, float dt)
+        {
+            UpdateWithYPosition(y, dt);
+            return this;
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -177,6 +213,12 @@ namespace CocosNG.Core.Nodes
         public void AddInfiniteScrollWithZ(int z, CCPoint ratio, CCPoint pos, CCPoint dir, CCSprite[] objects)
         {
             AddInfiniteScrollWithObjects(objects, z, ratio, pos, dir);
+        }
+
+        public CCParallaxScrollNode AddInfiniteScrollWithZAnd(int z, CCPoint ratio, CCPoint pos, CCPoint dir, CCSprite[] objects)
+        {
+            AddInfiniteScrollWithZ(z, ratio, pos, dir, objects);
+            return this;
         }
         /// <summary>
         /// 
@@ -190,6 +232,12 @@ namespace CocosNG.Core.Nodes
             AddInfiniteScrollWithObjects(objects, z, ratio, pos, new CCPoint(1, 0));
         }
 
+        public CCParallaxScrollNode AddInfiniteScrollXWithZAnd(int z, CCPoint ratio, CCPoint pos, CCSprite[] objects)
+        {
+            AddInfiniteScrollXWithZ(z, ratio, pos, objects);
+            return this;
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -200,6 +248,12 @@ namespace CocosNG.Core.Nodes
         public void AddInfiniteScrollYWithZ(int z, CCPoint ratio, CCPoint pos, CCSprite[] objects)
         {
             AddInfiniteScrollWithObjects(objects, z, ratio, pos, new CCPoint(0, 1));
+        }
+
+        public CCParallaxScrollNode AddInfiniteScrollYWithZAnd(int z, CCPoint ratio, CCPoint pos, CCSprite[] objects)
+        {
+            AddInfiniteScrollYWithZ(z, ratio, pos, objects);
+            return this;
         }
 
         /// <summary>
@@ -235,6 +289,12 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCParallaxScrollNode AddInfiniteScrollWithObjectsAnd(CCSprite[] objects, int z, CCPoint ratio, CCPoint pos, CCPoint dir)
+        {
+            AddInfiniteScrollWithObjects(objects, z, ratio, pos, dir);
+            return this;
+        }
+
         public CCSpriteBatchNode BatchNode
         {
             get
@@ -246,6 +306,12 @@ namespace CocosNG.Core.Nodes
                 m_Batch = value;
             }
         }
+
+        public CCParallaxScrollNode WithBatchNode(CCSpriteBatchNode batch)
+        {
+            BatchNode = batch;
+            return this;
+        }
         public List<CCParallaxScrollOffset> ScrollOffsets
         {
             get
@@ -256,6 +322,12 @@ namespace CocosNG.Core.Nodes
             {
                 m_ScrollOffsets = value;
             }
+        }
+
+        public CCParallaxScrollNode WithScrollOffsets(List<CCParallaxScrollOffset> offsets)
+        {
+            ScrollOffsets = offsets;
+            return this;
         }
     }
 }

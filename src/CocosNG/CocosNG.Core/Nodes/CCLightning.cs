@@ -50,6 +50,12 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCLightning WithSway(float sway)
+        {
+            Sway = sway;
+            return this;
+        }
+
         private float m_GlowSize = .75f;
         public virtual float GlowSize
         {
@@ -63,10 +69,22 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCLightning WithGlowSize(float glowSize)
+        {
+            GlowSize = glowSize;
+            return this;
+        }
+
         public virtual bool DrawShadowSegments
         {
             get;
             set;
+        }
+
+        public CCLightning WithDrawShadowSegments(bool enabled)
+        {
+            DrawShadowSegments = enabled;
+            return this;
         }
 
         /// <summary>
@@ -173,6 +191,12 @@ namespace CocosNG.Core.Nodes
                 LastSegmentIndex = 0,
                 DrawNodeVertexIndex = new List<int>()
             });
+        }
+
+        public CCLightning AddBoltAnd(CCLightningBolt bolt)
+        {
+            AddBolt(bolt);
+            return this;
         }
 
         /// <summary>

@@ -53,6 +53,12 @@ namespace CocosNG.Core.Nodes.Layers
             }
         }
 
+        public CCLayer WithClipMode(CCClipMode clipMode)
+        {
+            ChildClippingMode = clipMode;
+            return this;
+        }
+
         public override CCSize ContentSize
         {
             get { return base.ContentSize; }

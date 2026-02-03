@@ -4,6 +4,18 @@ namespace CocosNG.Core.Actions.Interval
 {
     public class CCRepeatForever : CCActionInterval
     {
+        public CCRepeatForever WithAction(CCActionInterval action)
+        {
+            InitWithAction(action);
+            return this;
+        }
+
+        public CCRepeatForever WithInnerAction(CCActionInterval action)
+        {
+            InnerAction = action;
+            return this;
+        }
+
         protected CCActionInterval m_pInnerAction;
 
         public CCActionInterval InnerAction

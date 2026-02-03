@@ -4,6 +4,20 @@ namespace CocosNG.Core.Actions.Interval
 {
     public class CCSequence : CCActionInterval
     {
+        public CCSequence Then(CCFiniteTimeAction action)
+        {
+            return new CCSequence(this, action);
+        }
+
+        public CCSequence Then(params CCFiniteTimeAction[] actions)
+        {
+            if (actions == null || actions.Length == 0)
+            {
+                return this;
+            }
+            return new CCSequence(this, new CCSequence(actions));
+        }
+
         protected int m_last;
         protected CCFiniteTimeAction[] m_pActions = new CCFiniteTimeAction[2];
         protected float m_split;

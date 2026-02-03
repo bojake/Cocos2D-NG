@@ -15,7 +15,7 @@ namespace CocosNG.Core.Nodes
 
         public IList<CCNode> Children { get; }
 
-        public void AddChild(CCNode child, float z = 0f) {
+        public CCContainer AddChild(CCNode child, float z = 0f) {
             child.Parent = this;
             child.Z = z;
             child.__seq_id = Children.Count;
@@ -32,10 +32,25 @@ namespace CocosNG.Core.Nodes
             }
 
             Children.Insert(lo, child);
+            return this;
         }
-        public void RemoveChild(CCNode child)
+
+        public CCContainer Add(CCNode child, float z = 0f)
+        {
+            AddChild(child, z);
+            return this;
+        }
+
+        public CCContainer RemoveChild(CCNode child)
         {
             Children.Remove(child);
+            return this;
+        }
+
+        public CCContainer Remove(CCNode child)
+        {
+            RemoveChild(child);
+            return this;
         }
 
         public CCContainer()

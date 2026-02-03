@@ -32,6 +32,12 @@ namespace CocosNG.Core.Nodes.Sprites
             set { m_blendFunc = value; }
         }
 
+        public CCSpriteBatchNode WithBlendFunc(CCBlendFunc blendFunc)
+        {
+            BlendFunc = blendFunc;
+            return this;
+        }
+
         public virtual CCTexture2D Texture
         {
             get { return m_pobTextureAtlas.Texture; }
@@ -46,12 +52,30 @@ namespace CocosNG.Core.Nodes.Sprites
         	}
         }
 
+        public CCSpriteBatchNode WithTexture(CCTexture2D texture)
+        {
+            Texture = texture;
+            return this;
+        }
+
+        public CCSpriteBatchNode WithTextureFile(string fileImage, int capacity = kDefaultSpriteBatchCapacity)
+        {
+            InitWithFile(fileImage, capacity);
+            return this;
+        }
+
 		public bool IsAntialiased
 		{
 			get { return Texture.IsAntialiased; }
 
 			set { Texture.IsAntialiased = value; }
 		}
+
+        public CCSpriteBatchNode WithAntialiased(bool antialiased)
+        {
+            IsAntialiased = antialiased;
+            return this;
+        }
 
         #endregion
 

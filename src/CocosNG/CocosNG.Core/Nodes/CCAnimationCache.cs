@@ -36,6 +36,12 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCAnimationCache AddAnimationAnd(CCAnimation animation, string name)
+        {
+            AddAnimation(animation, name);
+            return this;
+        }
+
         public void RemoveAnimationByName(string name)
         {
             if (string.IsNullOrEmpty(name))
@@ -43,6 +49,12 @@ namespace CocosNG.Core.Nodes
                 return;
             }
             m_pAnimations.Remove(name);
+        }
+
+        public CCAnimationCache RemoveAnimationByNameAnd(string name)
+        {
+            RemoveAnimationByName(name);
+            return this;
         }
 
         public CCAnimation this[string index]
@@ -103,6 +115,12 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCAnimationCache AddAnimationsWithDictionaryAnd(PlistDictionary dictionary)
+        {
+            AddAnimationsWithDictionary(dictionary);
+            return this;
+        }
+
         public void AddAnimationsWithFile(string plist)
         {
             Debug.Assert(!string.IsNullOrEmpty(plist), "Invalid texture file name");
@@ -116,10 +134,22 @@ namespace CocosNG.Core.Nodes
             AddAnimationsWithDictionary(dict);
         }
 
+        public CCAnimationCache AddAnimationsWithFileAnd(string plist)
+        {
+            AddAnimationsWithFile(plist);
+            return this;
+        }
+
         public bool Init()
         {
             m_pAnimations = new Dictionary<string, CCAnimation>();
             return true;
+        }
+
+        public CCAnimationCache InitAnd()
+        {
+            Init();
+            return this;
         }
 
         private void ParseVersion1(PlistDictionary animations)

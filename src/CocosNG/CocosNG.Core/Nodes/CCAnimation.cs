@@ -55,6 +55,12 @@ namespace CocosNG.Core.Nodes
             set { m_fDelayPerUnit = value; }
         }
 
+        public CCAnimation WithDelayPerUnit(float delayPerUnit)
+        {
+            DelayPerUnit = delayPerUnit;
+            return this;
+        }
+
         public List<CCAnimationFrame> Frames
         {
             get { return m_pFrames; }
@@ -66,10 +72,22 @@ namespace CocosNG.Core.Nodes
             set { m_bRestoreOriginalFrame = value; }
         }
 
+        public CCAnimation WithRestoreOriginalFrame(bool restore)
+        {
+            RestoreOriginalFrame = restore;
+            return this;
+        }
+
         public uint Loops
         {
             get { return m_uLoops; }
             set { m_uLoops = value; }
+        }
+
+        public CCAnimation WithLoops(uint loops)
+        {
+            Loops = loops;
+            return this;
         }
 
         public float TotalDelayUnits
@@ -108,6 +126,12 @@ namespace CocosNG.Core.Nodes
             return true;
         }
 
+        public CCAnimation WithSpriteFrames(List<CCSpriteFrame> frames, float delay)
+        {
+            InitWithSpriteFrames(frames, delay);
+            return this;
+        }
+
         protected virtual bool InitWithAnimationFrames(List<CCAnimationFrame> arrayOfAnimationFrames, float delayPerUnit, uint loops)
         {
             if (arrayOfAnimationFrames != null)
@@ -133,10 +157,22 @@ namespace CocosNG.Core.Nodes
             return true;
         }
 
+        public CCAnimation WithAnimationFrames(List<CCAnimationFrame> frames, float delayPerUnit, uint loops)
+        {
+            InitWithAnimationFrames(frames, delayPerUnit, loops);
+            return this;
+        }
+
         public void AddSprite(CCSprite sprite)
         {
             CCSpriteFrame f = new CCSpriteFrame(sprite.Texture, new CCRect(0, 0, sprite.ContentSize.Width, sprite.ContentSize.Height));
             AddSpriteFrame(f);
+        }
+
+        public CCAnimation AddSpriteAnd(CCSprite sprite)
+        {
+            AddSprite(sprite);
+            return this;
         }
 
         public void AddSpriteFrame(CCSpriteFrame pFrame)
@@ -149,6 +185,12 @@ namespace CocosNG.Core.Nodes
             m_fTotalDelayUnits++;
         }
 
+        public CCAnimation AddSpriteFrameAnd(CCSpriteFrame frame)
+        {
+            AddSpriteFrame(frame);
+            return this;
+        }
+
         public void AddSpriteFrameWithFileName(string pszFileName)
         {
             CCTexture2D pTexture = CCTextureCache.SharedTextureCache.AddImage(pszFileName);
@@ -158,10 +200,22 @@ namespace CocosNG.Core.Nodes
             AddSpriteFrame(pFrame);
         }
 
+        public CCAnimation AddSpriteFrameWithFileNameAnd(string fileName)
+        {
+            AddSpriteFrameWithFileName(fileName);
+            return this;
+        }
+
         public void AddSpriteFrameWithTexture(CCTexture2D pobTexture, CCRect rect)
         {
             CCSpriteFrame pFrame = new CCSpriteFrame(pobTexture, rect);
             AddSpriteFrame(pFrame);
+        }
+
+        public CCAnimation AddSpriteFrameWithTextureAnd(CCTexture2D texture, CCRect rect)
+        {
+            AddSpriteFrameWithTexture(texture, rect);
+            return this;
         }
 
 		public CCAnimation Copy()

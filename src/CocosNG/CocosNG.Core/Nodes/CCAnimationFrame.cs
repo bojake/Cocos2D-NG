@@ -13,14 +13,32 @@ namespace CocosNG.Core.Nodes
             get { return m_pSpriteFrame; }
         }
 
+        public CCAnimationFrame WithSpriteFrame(CCSpriteFrame spriteFrame)
+        {
+            m_pSpriteFrame = spriteFrame;
+            return this;
+        }
+
         public float DelayUnits
         {
             get { return m_fDelayUnits; }
         }
 
+        public CCAnimationFrame WithDelayUnits(float delayUnits)
+        {
+            m_fDelayUnits = delayUnits;
+            return this;
+        }
+
         public PlistDictionary UserInfo
         {
             get { return m_pUserInfo; }
+        }
+
+        public CCAnimationFrame WithUserInfo(PlistDictionary userInfo)
+        {
+            m_pUserInfo = userInfo;
+            return this;
         }
 
 		public CCAnimationFrame Copy()
@@ -52,6 +70,12 @@ namespace CocosNG.Core.Nodes
             m_fDelayUnits = delayUnits;
             m_pUserInfo = userInfo;
             return true;
+        }
+
+        public CCAnimationFrame WithSpriteFrame(CCSpriteFrame spriteFrame, float delayUnits, PlistDictionary userInfo)
+        {
+            InitWithSpriteFrame(spriteFrame, delayUnits, userInfo);
+            return this;
         }
     }
 }

@@ -10,10 +10,10 @@ namespace CocosNG.Core
     //
     /** @brief Light weight timer */
 
-    public class CCTimer : ICCSelectorProtocol
+    public class CCTimer : ISchedulerTarget
     {
         private CCScheduler _scheduler;
-        private readonly ICCSelectorProtocol m_pTarget;
+        private readonly ISchedulerTarget m_pTarget;
 
         private readonly bool m_bRunForever;
         private readonly float m_fDelay;
@@ -35,7 +35,7 @@ namespace CocosNG.Core
         /** Initializes a timer with a target and a selector. 
          */
 
-        public CCTimer(CCScheduler scheduler, ICCSelectorProtocol target, Action<float> selector)
+        public CCTimer(CCScheduler scheduler, ISchedulerTarget target, Action<float> selector)
             : this(scheduler, target, selector, 0, 0, 0)
         {
         }
@@ -44,12 +44,12 @@ namespace CocosNG.Core
          *  Target is not needed in c#, it is just for compatibility.
          */
 
-        public CCTimer(CCScheduler scheduler, ICCSelectorProtocol target, Action<float> selector, float seconds)
+        public CCTimer(CCScheduler scheduler, ISchedulerTarget target, Action<float> selector, float seconds)
             : this(scheduler, target, selector, seconds, 0, 0)
         {
         }
 
-        public CCTimer(CCScheduler scheduler, ICCSelectorProtocol target, Action<float> selector, float seconds,
+        public CCTimer(CCScheduler scheduler, ISchedulerTarget target, Action<float> selector, float seconds,
                        uint repeat, float delay)
         {
             _scheduler = scheduler;
@@ -190,13 +190,13 @@ namespace CocosNG.Core
         public const int kCCPriorityNonSystemMin = kCCPrioritySystem + 1;
 
         private static HashTimeEntry[] s_pTmpHashSelectorArray = new HashTimeEntry[128];
-        private static ICCSelectorProtocol[] s_pTmpSelectorArray = new ICCSelectorProtocol[128];
+        private static ISchedulerTarget[] s_pTmpSelectorArray = new ISchedulerTarget[128];
 
-        private readonly Dictionary<ICCSelectorProtocol, HashTimeEntry> m_pHashForTimers =
-            new Dictionary<ICCSelectorProtocol, HashTimeEntry>();
+        private readonly Dictionary<ISchedulerTarget, HashTimeEntry> m_pHashForTimers =
+            new Dictionary<ISchedulerTarget, HashTimeEntry>();
 
-        private readonly Dictionary<ICCSelectorProtocol, HashUpdateEntry> m_pHashForUpdates =
-            new Dictionary<ICCSelectorProtocol, HashUpdateEntry>();
+        private readonly Dictionary<ISchedulerTarget, HashUpdateEntry> m_pHashForUpdates =
+            new Dictionary<ISchedulerTarget, HashUpdateEntry>();
 
         // hash used to fetch quickly the list entries for pause,delete,etc
         private readonly LinkedList<ListEntry> m_pUpdates0List = new LinkedList<ListEntry>(); // list priority == 0
@@ -211,7 +211,7 @@ namespace CocosNG.Core
 
         public event Action<Exception> OnUnhandledException;
 
-        private void UpdateTarget(ICCSelectorProtocol target, float dt)
+        private void UpdateTarget(ISchedulerTarget target, float dt)
         {
             if (OnUnhandledException == null)
             {
@@ -278,13 +278,13 @@ namespace CocosNG.Core
                 var count = m_pHashForTimers.Keys.Count;
                 if (s_pTmpSelectorArray.Length < count)
                 {
-                    s_pTmpSelectorArray = new ICCSelectorProtocol[s_pTmpSelectorArray.Length * 2];
+                    s_pTmpSelectorArray = new ISchedulerTarget[s_pTmpSelectorArray.Length * 2];
                 }
                 m_pHashForTimers.Keys.CopyTo(s_pTmpSelectorArray, 0);
 
                 for (int i = 0; i < count; i++)
                 {
-                    ICCSelectorProtocol key = s_pTmpSelectorArray[i];
+                    ISchedulerTarget key = s_pTmpSelectorArray[i];
 					if (key == null || !m_pHashForTimers.ContainsKey(key))
                     {
                         continue;
@@ -386,7 +386,7 @@ namespace CocosNG.Core
          @since v0.99.3, repeat and delay added in v1.1
          */
 
-        public void ScheduleSelector(Action<float> selector, ICCSelectorProtocol target, float interval, uint repeat,
+        public void ScheduleSelector(Action<float> selector, ISchedulerTarget target, float interval, uint repeat,
                                      float delay, bool paused)
         {
             Debug.Assert(selector != null);
@@ -448,7 +448,7 @@ namespace CocosNG.Core
     	     @since v0.99.3
     	     */
 
-        public void ScheduleUpdateForTarget(ICCSelectorProtocol targt, int priority, bool paused)
+        public void ScheduleUpdateForTarget(ISchedulerTarget targt, int priority, bool paused)
         {
             HashUpdateEntry element;
 
@@ -483,7 +483,7 @@ namespace CocosNG.Core
     	     @since v0.99.3
     	     */
 
-        public void UnscheduleSelector(Action<float> selector, ICCSelectorProtocol target)
+        public void UnscheduleSelector(Action<float> selector, ISchedulerTarget target)
         {
             // explicity handle nil arguments when removing an object
             if (selector == null || target == null)
@@ -539,7 +539,7 @@ namespace CocosNG.Core
     	     @since v0.99.3
     	     */
 
-        public void UnscheduleAllForTarget(ICCSelectorProtocol target)
+        public void UnscheduleAllForTarget(ISchedulerTarget target)
         {
             // explicit NULL handling
             if (target == null)
@@ -599,7 +599,7 @@ namespace CocosNG.Core
         }
         */
 
-        public void UnscheduleUpdateForTarget(ICCSelectorProtocol target)
+        public void UnscheduleUpdateForTarget(ISchedulerTarget target)
         {
             if (target == null)
             {
@@ -676,14 +676,14 @@ namespace CocosNG.Core
             }
         }
 
-        public List<ICCSelectorProtocol> PauseAllTargets()
+        public List<ISchedulerTarget> PauseAllTargets()
         {
             return PauseAllTargetsWithMinPriority(int.MinValue);
         }
 
-        public List<ICCSelectorProtocol> PauseAllTargetsWithMinPriority(int minPriority)
+        public List<ISchedulerTarget> PauseAllTargetsWithMinPriority(int minPriority)
         {
-            var idsWithSelectors = new List<ICCSelectorProtocol>();
+            var idsWithSelectors = new List<ISchedulerTarget>();
 
             // Custom Selectors
             foreach (HashTimeEntry element in m_pHashForTimers.Values)
@@ -729,15 +729,15 @@ namespace CocosNG.Core
             return idsWithSelectors;
         }
 
-        public void ResumeTargets(List<ICCSelectorProtocol> targetsToResume)
+        public void ResumeTargets(List<ISchedulerTarget> targetsToResume)
         {
-            foreach (ICCSelectorProtocol target in targetsToResume)
+            foreach (ISchedulerTarget target in targetsToResume)
             {
                 ResumeTarget(target);
             }
         }
 
-        public void PauseTarget(ICCSelectorProtocol target)
+        public void PauseTarget(ISchedulerTarget target)
         {
             Debug.Assert(target != null);
 
@@ -756,7 +756,7 @@ namespace CocosNG.Core
             }
         }
 
-        public void ResumeTarget(ICCSelectorProtocol target)
+        public void ResumeTarget(ISchedulerTarget target)
         {
             Debug.Assert(target != null);
 
@@ -775,7 +775,7 @@ namespace CocosNG.Core
             }
         }
 
-        public bool IsTargetPaused(ICCSelectorProtocol target)
+        public bool IsTargetPaused(ISchedulerTarget target)
         {
             Debug.Assert(target != null, "target must be non nil");
 
@@ -820,7 +820,7 @@ namespace CocosNG.Core
             }
         }
 
-        private void PriorityIn(LinkedList<ListEntry> list, ICCSelectorProtocol target, int priority, bool paused)
+        private void PriorityIn(LinkedList<ListEntry> list, ISchedulerTarget target, int priority, bool paused)
         {
             var listElement = new ListEntry
                 {
@@ -864,7 +864,7 @@ namespace CocosNG.Core
             m_pHashForUpdates.Add(target, hashElement);
         }
 
-        private void AppendIn(LinkedList<ListEntry> list, ICCSelectorProtocol target, bool paused)
+        private void AppendIn(LinkedList<ListEntry> list, ISchedulerTarget target, bool paused)
         {
             var listElement = new ListEntry
                 {
@@ -893,7 +893,7 @@ namespace CocosNG.Core
             public CCTimer CurrentTimer;
             public bool CurrentTimerSalvaged;
             public bool Paused;
-            public ICCSelectorProtocol Target;
+            public ISchedulerTarget Target;
             public int TimerIndex;
             public List<CCTimer> Timers;
         }
@@ -906,7 +906,7 @@ namespace CocosNG.Core
         {
             public ListEntry Entry; // entry in the list
             public LinkedList<ListEntry> List; // Which list does it belong to ?
-            public ICCSelectorProtocol Target; // hash key
+            public ISchedulerTarget Target; // hash key
         }
 
         #endregion
@@ -918,7 +918,7 @@ namespace CocosNG.Core
             public bool MarkedForDeletion;
             public bool Paused;
             public int Priority;
-            public ICCSelectorProtocol Target;
+            public ISchedulerTarget Target;
         }
 
         #endregion

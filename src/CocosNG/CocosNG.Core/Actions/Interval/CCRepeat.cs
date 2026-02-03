@@ -2,6 +2,31 @@ namespace CocosNG.Core.Actions.Interval
 {
     public class CCRepeat : CCActionInterval
     {
+        public CCRepeat WithAction(CCFiniteTimeAction action, uint times)
+        {
+            InitWithAction(action, times);
+            return this;
+        }
+
+        public CCRepeat WithInnerAction(CCFiniteTimeAction action)
+        {
+            if (action != null)
+            {
+                InitWithAction(action, m_uTimes);
+            }
+            else
+            {
+                InnerAction = action;
+            }
+            return this;
+        }
+
+        public CCRepeat WithTimes(uint times)
+        {
+            InitWithAction(m_pInnerAction, times);
+            return this;
+        }
+
         protected bool m_bActionInstant;
         protected float m_fNextDt;
         protected CCFiniteTimeAction m_pInnerAction;

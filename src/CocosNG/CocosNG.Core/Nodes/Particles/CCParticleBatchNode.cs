@@ -36,10 +36,22 @@ namespace CocosNG.Core.Nodes.Particles
             }
         }
 
+        public CCParticleBatchNode WithTexture(CCTexture2D texture)
+        {
+            Texture = texture;
+            return this;
+        }
+
         public CCBlendFunc BlendFunc
         {
             get { return m_tBlendFunc; }
             set { m_tBlendFunc = value; }
+        }
+
+        public CCParticleBatchNode WithBlendFunc(CCBlendFunc blendFunc)
+        {
+            BlendFunc = blendFunc;
+            return this;
         }
 
         #endregion
@@ -81,6 +93,12 @@ namespace CocosNG.Core.Nodes.Particles
             return true;
         }
 
+        public CCParticleBatchNode WithTexture(CCTexture2D tex, int capacity)
+        {
+            InitWithTexture(tex, capacity);
+            return this;
+        }
+
         /*
          * init with FileImage
          */
@@ -89,6 +107,12 @@ namespace CocosNG.Core.Nodes.Particles
         {
             CCTexture2D tex = CCTextureCache.SharedTextureCache.AddImage(fileImage);
             return InitWithTexture(tex, capacity);
+        }
+
+        public CCParticleBatchNode WithFile(string fileImage, int capacity = kCCParticleDefaultCapacity)
+        {
+            InitWithFile(fileImage, capacity);
+            return this;
         }
 
         // CCParticleBatchNode - composition
@@ -169,6 +193,12 @@ namespace CocosNG.Core.Nodes.Particles
 
             // update quad info
             pChild.BatchNode = this;
+        }
+
+        public CCParticleBatchNode AddChildAnd(CCParticleSystem child, int zOrder, int tag)
+        {
+            AddChild(child, zOrder, tag);
+            return this;
         }
 
         // don't use lazy sorting, reordering the particle systems quads afterwards would be too complex
@@ -392,9 +422,21 @@ namespace CocosNG.Core.Nodes.Particles
             UpdateAllAtlasIndexes();
         }
 
+        public CCParticleBatchNode RemoveChildAnd(CCParticleSystem child, bool cleanup)
+        {
+            RemoveChild(child, cleanup);
+            return this;
+        }
+
         public void RemoveChildAtIndex(int index, bool doCleanup)
         {
             RemoveChild(m_pChildren[index], doCleanup);
+        }
+
+        public CCParticleBatchNode RemoveChildAtIndexAnd(int index, bool doCleanup)
+        {
+            RemoveChildAtIndex(index, doCleanup);
+            return this;
         }
 
         public override void RemoveAllChildrenWithCleanup(bool doCleanup)
@@ -407,6 +449,12 @@ namespace CocosNG.Core.Nodes.Particles
             base.RemoveAllChildrenWithCleanup(doCleanup);
 
             TextureAtlas.RemoveAllQuads();
+        }
+
+        public CCParticleBatchNode RemoveAllChildrenWithCleanupAnd(bool doCleanup)
+        {
+            RemoveAllChildrenWithCleanup(doCleanup);
+            return this;
         }
 
         public override void Draw()

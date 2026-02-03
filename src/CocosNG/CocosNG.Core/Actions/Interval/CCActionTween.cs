@@ -10,6 +10,25 @@ namespace CocosNG.Core.Actions.Interval
 
     public class CCActionTween : CCActionInterval
     {
+        public CCActionTween WithTween(string key, float from, float to, float duration)
+        {
+            InitWithDuration(duration, key, from, to);
+            return this;
+        }
+
+        public CCActionTween WithTween(string key, float from, float to, float duration, Action<float, string> tweenAction)
+        {
+            InitWithDuration(duration, key, from, to);
+            _tweenAction = tweenAction;
+            return this;
+        }
+
+        public CCActionTween WithTweenAction(Action<float, string> tweenAction)
+        {
+            _tweenAction = tweenAction;
+            return this;
+        }
+
         protected float m_fDelta;
         protected float m_fFrom, m_fTo;
         protected string m_strKey;

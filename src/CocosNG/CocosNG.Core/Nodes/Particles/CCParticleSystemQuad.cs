@@ -111,6 +111,18 @@ namespace CocosNG.Core.Nodes.Particles
             InitTexCoordsWithRect(rect);
         }
 
+        public CCParticleSystemQuad WithTexture(CCTexture2D texture)
+        {
+            Texture = texture;
+            return this;
+        }
+
+        public CCParticleSystemQuad WithTextureRect(CCTexture2D texture, CCRect rect)
+        {
+            SetTextureWithRect(texture, rect);
+            return this;
+        }
+
         public override CCTexture2D Texture
         {
             set
@@ -130,6 +142,12 @@ namespace CocosNG.Core.Nodes.Particles
             {
                 Texture = spriteFrame.Texture;
             }
+        }
+
+        public CCParticleSystemQuad WithDisplayFrame(CCSpriteFrame spriteFrame)
+        {
+            SetDisplayFrame(spriteFrame);
+            return this;
         }
 
         private static CCPoint s_currentPosition;

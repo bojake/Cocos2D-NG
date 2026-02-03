@@ -25,6 +25,12 @@ namespace CocosNG.Core.Nodes
             set { m_pSprite = value; }
         }
 
+        public CCRenderTexture WithSprite(CCSprite sprite)
+        {
+            Sprite = sprite;
+            return this;
+        }
+
         public CCRenderTexture(int w, int h)
         {
             InitWithWidthAndHeight(w, h, SurfaceFormat.Color, DepthFormat.None, RenderTargetUsage.DiscardContents);
@@ -86,6 +92,24 @@ namespace CocosNG.Core.Nodes
             return true;
         }
 
+        public CCRenderTexture WithSize(int width, int height)
+        {
+            InitWithWidthAndHeight(width, height, SurfaceFormat.Color, DepthFormat.None, RenderTargetUsage.DiscardContents);
+            return this;
+        }
+
+        public CCRenderTexture WithSize(int width, int height, SurfaceFormat colorFormat)
+        {
+            InitWithWidthAndHeight(width, height, colorFormat, DepthFormat.None, RenderTargetUsage.DiscardContents);
+            return this;
+        }
+
+        public CCRenderTexture WithSize(int width, int height, SurfaceFormat colorFormat, DepthFormat depthFormat, RenderTargetUsage usage)
+        {
+            InitWithWidthAndHeight(width, height, colorFormat, depthFormat, usage);
+            return this;
+        }
+
         public virtual void Begin()
         {
             if (m_pTexture.IsDisposed)
@@ -122,10 +146,22 @@ namespace CocosNG.Core.Nodes
             }
         }
 
+        public CCRenderTexture BeginAnd()
+        {
+            Begin();
+            return this;
+        }
+
         public void BeginWithClear(float r, float g, float b, float a)
         {
             Begin();
             CCDrawManager.Clear(new Color(r, g, b, a));
+        }
+
+        public CCRenderTexture BeginWithClearAnd(float r, float g, float b, float a)
+        {
+            BeginWithClear(r, g, b, a);
+            return this;
         }
 
         public void BeginWithClear(float r, float g, float b, float a, float depthValue)
@@ -134,10 +170,22 @@ namespace CocosNG.Core.Nodes
             CCDrawManager.Clear(new Color(r, g, b, a), depthValue);
         }
 
+        public CCRenderTexture BeginWithClearAnd(float r, float g, float b, float a, float depthValue)
+        {
+            BeginWithClear(r, g, b, a, depthValue);
+            return this;
+        }
+
         public void BeginWithClear(float r, float g, float b, float a, float depthValue, int stencilValue)
         {
             Begin();
             CCDrawManager.Clear(new Color(r, g, b, a), depthValue, stencilValue);
+        }
+
+        public CCRenderTexture BeginWithClearAnd(float r, float g, float b, float a, float depthValue, int stencilValue)
+        {
+            BeginWithClear(r, g, b, a, depthValue, stencilValue);
+            return this;
         }
 
         public void ClearDepth(float depthValue)
@@ -165,10 +213,22 @@ namespace CocosNG.Core.Nodes
             director.Projection = director.Projection;
         }
 
+        public CCRenderTexture EndAnd()
+        {
+            End();
+            return this;
+        }
+
         public void Clear(float r, float g, float b, float a)
         {
             BeginWithClear(r, g, b, a);
             End();
+        }
+
+        public CCRenderTexture ClearAnd(float r, float g, float b, float a)
+        {
+            Clear(r, g, b, a);
+            return this;
         }
 
         public bool SaveToStream(Stream stream, CCImageFormat format)
@@ -187,6 +247,12 @@ namespace CocosNG.Core.Nodes
             }
             
             return true;
+        }
+
+        public CCRenderTexture SaveToStreamAnd(Stream stream, CCImageFormat format)
+        {
+            SaveToStream(stream, format);
+            return this;
         }
     }
 }

@@ -32,6 +32,12 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSpriteFrame WithRect(CCRect rect)
+        {
+            Rect = rect;
+            return this;
+        }
+
         public CCRect RectInPixels
         {
             get { return m_obRectInPixels; }
@@ -40,6 +46,12 @@ namespace CocosNG.Core.Nodes.Sprites
                 m_obRectInPixels = value;
                 m_obRect = m_obRectInPixels.PixelsToPoints();
             }
+        }
+
+        public CCSpriteFrame WithRectInPixels(CCRect rect)
+        {
+            RectInPixels = rect;
+            return this;
         }
 
         public CCPoint Offset
@@ -52,6 +64,12 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSpriteFrame WithOffset(CCPoint offset)
+        {
+            Offset = offset;
+            return this;
+        }
+
         public CCPoint OffsetInPixels
         {
             get { return m_obOffsetInPixels; }
@@ -62,10 +80,22 @@ namespace CocosNG.Core.Nodes.Sprites
             }
         }
 
+        public CCSpriteFrame WithOffsetInPixels(CCPoint offset)
+        {
+            OffsetInPixels = offset;
+            return this;
+        }
+
         public bool IsRotated
         {
             get { return m_bRotated; }
             set { m_bRotated = value; }
+        }
+
+        public CCSpriteFrame WithRotated(bool rotated)
+        {
+            IsRotated = rotated;
+            return this;
         }
 
 
@@ -75,10 +105,22 @@ namespace CocosNG.Core.Nodes.Sprites
             set { m_obOriginalSizeInPixels = value; }
         }
 
+        public CCSpriteFrame WithOriginalSizeInPixels(CCSize size)
+        {
+            OriginalSizeInPixels = size;
+            return this;
+        }
+
         public CCSize OriginalSize
         {
             get { return m_obOriginalSize; }
             set { m_obOriginalSize = value; }
+        }
+
+        public CCSpriteFrame WithOriginalSize(CCSize size)
+        {
+            OriginalSize = size;
+            return this;
         }
 
         /// <summary>
@@ -88,6 +130,12 @@ namespace CocosNG.Core.Nodes.Sprites
         {
             get { return m_pobTexture; }
             set { m_pobTexture = value; }
+        }
+
+        public CCSpriteFrame WithTexture(CCTexture2D texture)
+        {
+            Texture = texture;
+            return this;
         }
 
         #endregion
@@ -123,6 +171,12 @@ namespace CocosNG.Core.Nodes.Sprites
             return InitWithTexture(pobTexture, rectInPixels, false, new CCPoint(0, 0), rectInPixels.Size);
         }
 
+        public CCSpriteFrame WithTexture(CCTexture2D texture, CCRect rect)
+        {
+            InitWithTexture(texture, rect);
+            return this;
+        }
+
         protected virtual bool InitWithTexture(CCTexture2D pobTexture, CCRect rect, bool rotated, CCPoint offset,
                                     CCSize originalSize)
         {
@@ -139,9 +193,21 @@ namespace CocosNG.Core.Nodes.Sprites
             return true;
         }
 
+        public CCSpriteFrame WithTexture(CCTexture2D texture, CCRect rect, bool rotated, CCPoint offset, CCSize originalSize)
+        {
+            InitWithTexture(texture, rect, rotated, offset, originalSize);
+            return this;
+        }
+
         protected virtual bool InitWithTextureFilename(String filename, CCRect rect)
         {
             return InitWithTextureFilename(filename, rect, false, CCPoint.Zero, rect.Size);
+        }
+
+        public CCSpriteFrame WithTextureFilename(string filename, CCRect rect)
+        {
+            InitWithTextureFilename(filename, rect);
+            return this;
         }
 
         protected virtual bool InitWithTextureFilename(String filename, CCRect rect, bool rotated, CCPoint offset,
@@ -158,6 +224,12 @@ namespace CocosNG.Core.Nodes.Sprites
             m_bRotated = rotated;
 
             return true;
+        }
+
+        public CCSpriteFrame WithTextureFilename(string filename, CCRect rect, bool rotated, CCPoint offset, CCSize originalSize)
+        {
+            InitWithTextureFilename(filename, rect, rotated, offset, originalSize);
+            return this;
         }
     }
 }
