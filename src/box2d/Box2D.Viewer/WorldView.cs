@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using Box2D.Common;
 using Box2D.Collision.Shapes;
 using Box2D.Dynamics;
+using Box2D.TestBed;
 
 namespace Box2D.Viewer
 {
@@ -15,8 +16,14 @@ namespace Box2D.Viewer
         private readonly Pen _dynamicPen = new Pen(Color.FromArgb(82, 170, 255), 1.5f);
         private readonly Brush _dynamicFill = new SolidBrush(Color.FromArgb(70, 82, 170, 255));
         private readonly Brush _staticFill = new SolidBrush(Color.FromArgb(50, 140, 160, 165));
+        private readonly Font _overlayFont = new Font("Consolas", 10.0f, FontStyle.Regular);
+        private readonly Brush _overlayBrush = new SolidBrush(Color.FromArgb(230, 235, 240));
+        private readonly Pen _debugPen = new Pen(Color.FromArgb(220, 200, 200, 200), 1.5f);
 
         public b2World World { get; set; }
+        public DebugDraw.DebugText[] OverlayText { get; set; }
+        public DebugDraw.DebugSegment[] DebugSegments { get; set; }
+        public DebugDraw.DebugPoint[] DebugPoints { get; set; }
 
         public WorldView()
         {
@@ -43,6 +50,10 @@ namespace Box2D.Viewer
                     DrawFixture(g, body, fixture);
                 }
             }
+
+            DrawDebugSegments(g);
+            DrawDebugPoints(g);
+            DrawOverlayText(g);
         }
 
         private void DrawFixture(Graphics g, b2Body body, b2Fixture fixture)
@@ -132,6 +143,81 @@ namespace Box2D.Viewer
             return new PointF(originX + world.x * PixelsPerMeter, originY - world.y * PixelsPerMeter);
         }
 
+        public b2Vec2 ScreenToWorld(Point point)
+        {
+            float originX = ClientSize.Width * 0.5f;
+            float originY = ClientSize.Height * 0.85f;
+            return new b2Vec2((point.X - originX) / PixelsPerMeter, (originY - point.Y) / PixelsPerMeter);
+        }
+
+        private void DrawDebugSegments(Graphics g)
+        {
+            if (DebugSegments == null || DebugSegments.Length == 0)
+            {
+                return;
+            }
+
+            foreach (var segment in DebugSegments)
+            {
+                _debugPen.Color = ToColor(segment.Color, 200);
+                PointF p1 = ToScreen(segment.P1);
+                PointF p2 = ToScreen(segment.P2);
+                g.DrawLine(_debugPen, p1, p2);
+            }
+        }
+
+        private void DrawDebugPoints(Graphics g)
+        {
+            if (DebugPoints == null || DebugPoints.Length == 0)
+            {
+                return;
+            }
+
+            foreach (var point in DebugPoints)
+            {
+                using (Brush brush = new SolidBrush(ToColor(point.Color, 230)))
+                {
+                    PointF screen = ToScreen(point.P);
+                    float size = point.Size;
+                    g.FillEllipse(brush, screen.X - size * 0.5f, screen.Y - size * 0.5f, size, size);
+                }
+            }
+        }
+
+        private static Color ToColor(b2Color color, int alpha)
+        {
+            int r = ClampToByte(color.r * 255.0f);
+            int g = ClampToByte(color.g * 255.0f);
+            int b = ClampToByte(color.b * 255.0f);
+            return Color.FromArgb(alpha, r, g, b);
+        }
+
+        private static int ClampToByte(float value)
+        {
+            if (value < 0.0f)
+            {
+                return 0;
+            }
+            if (value > 255.0f)
+            {
+                return 255;
+            }
+            return (int)value;
+        }
+
+        private void DrawOverlayText(Graphics g)
+        {
+            if (OverlayText == null || OverlayText.Length == 0)
+            {
+                return;
+            }
+
+            foreach (var line in OverlayText)
+            {
+                g.DrawString(line.Text, _overlayFont, _overlayBrush, line.X, line.Y);
+            }
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
@@ -140,6 +226,9 @@ namespace Box2D.Viewer
                 _dynamicPen.Dispose();
                 _dynamicFill.Dispose();
                 _staticFill.Dispose();
+                _overlayFont.Dispose();
+                _overlayBrush.Dispose();
+                _debugPen.Dispose();
             }
             base.Dispose(disposing);
         }

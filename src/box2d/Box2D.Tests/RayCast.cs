@@ -287,19 +287,65 @@ namespace Box2D.TestBed.Tests
             }
         }
 
+        public override void MouseDown(b2Vec2 p)
+        {
+            m_isDragging = true;
+            m_hasMouseRay = true;
+            m_mouseStart = p;
+            m_mouseEnd = p;
+        }
+
+        public override void MouseUp(b2Vec2 p)
+        {
+            m_isDragging = false;
+            m_hasMouseRay = true;
+            m_mouseEnd = p;
+        }
+
+        public override void MouseMove(b2Vec2 p)
+        {
+            if (m_isDragging)
+            {
+                m_mouseEnd = p;
+            }
+        }
+
         protected override void Draw(Settings settings)
         {
             base.Draw(settings);
 
-            m_debugDraw.DrawString(5, m_textLine, "Press 1-5 to drop stuff, m to change the mode");
+            m_debugDraw.DrawString(5, m_textLine, "Press 1-5 to drop stuff, d to destroy, m to change the mode");
             m_textLine += 15;
             m_debugDraw.DrawString(5, m_textLine, "Mode = {0}", m_mode);
             m_textLine += 15;
+            m_debugDraw.DrawString(5, m_textLine, "Click and drag to set the ray cast vector");
+            m_textLine += 15;
 
-            float L = 11.0f;
-            b2Vec2 point1 = new b2Vec2(0.0f, 10.0f);
-            b2Vec2 d = new b2Vec2(L * (float)Math.Cos(m_angle), L * (float)Math.Sin(m_angle));
-            b2Vec2 point2 = point1 + d;
+            b2Vec2 point1;
+            b2Vec2 point2;
+            if (m_hasMouseRay)
+            {
+                point1 = m_mouseStart;
+                point2 = m_mouseEnd;
+            }
+            else
+            {
+                float L = 11.0f;
+                point1 = new b2Vec2(0.0f, 10.0f);
+                b2Vec2 d = new b2Vec2(L * (float)Math.Cos(m_angle), L * (float)Math.Sin(m_angle));
+                point2 = point1 + d;
+            }
+
+            m_debugDraw.DrawPoint(point1, 4.0f, new b2Color(0.9f, 0.9f, 0.2f));
+            m_debugDraw.DrawPoint(point2, 4.0f, new b2Color(0.9f, 0.2f, 0.2f));
+
+            b2Vec2 delta = point2 - point1;
+            if (delta.LengthSquared < b2Settings.b2_epsilon * b2Settings.b2_epsilon)
+            {
+                return;
+            }
+
+            m_debugDraw.DrawSegment(point1, point2, new b2Color(0.5f, 0.5f, 0.5f));
 
             if (m_mode == Mode.e_closest)
             {
@@ -355,7 +401,7 @@ namespace Box2D.TestBed.Tests
 
         public override void Step(Settings settings)
         {
-            bool advanceRay = !settings.pause || settings.singleStep;
+            bool advanceRay = (!settings.pause || settings.singleStep) && !m_hasMouseRay;
 
             base.Step(settings);
 
@@ -414,5 +460,10 @@ namespace Box2D.TestBed.Tests
         public float m_angle;
 
         public Mode m_mode = new Mode();
+
+        private bool m_isDragging;
+        private bool m_hasMouseRay;
+        private b2Vec2 m_mouseStart;
+        private b2Vec2 m_mouseEnd;
     }
 }

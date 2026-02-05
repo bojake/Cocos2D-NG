@@ -54,6 +54,8 @@ namespace Box2D.TestBed
             m_world.SetDestructionListener(this);
         }
 
+        public DebugDraw DebugDraw => m_debugDraw;
+
         public virtual void Step(Settings settings)
         {
             float timeStep = settings.hz > 0.0f ? 1.0f / settings.hz : 0.0f;
@@ -85,6 +87,18 @@ namespace Box2D.TestBed
         }
 
         public virtual void KeyboardUp(char key)
+        {
+        }
+
+        public virtual void MouseDown(b2Vec2 p)
+        {
+        }
+
+        public virtual void MouseUp(b2Vec2 p)
+        {
+        }
+
+        public virtual void MouseMove(b2Vec2 p)
         {
         }
 

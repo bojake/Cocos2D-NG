@@ -337,7 +337,6 @@ namespace Box2D.TestBed.Tests
         private b2RayCastOutput m_rayCastOutput;
         private Actor m_rayActor = new Actor();
         private Actor[] m_actors = new Actor[e_actorCount];
-        private int m_stepCount;
         private bool m_automated;
     }
 }

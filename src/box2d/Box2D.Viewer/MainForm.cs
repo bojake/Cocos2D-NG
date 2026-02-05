@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Box2D;
+using Box2D.Common;
 using Box2D.Dynamics;
 using Box2D.TestBed;
 
@@ -38,7 +39,6 @@ namespace Box2D.Viewer
             };
             _scenarioPicker.Items.AddRange(_sessions.Keys.Cast<object>().ToArray());
             _scenarioPicker.SelectedIndexChanged += (_, __) => ResetWorld();
-
             _resetButton = new Button
             {
                 Text = "Reset",
@@ -60,6 +60,9 @@ namespace Box2D.Viewer
                 Dock = DockStyle.Fill,
                 BackColor = Color.FromArgb(20, 22, 25)
             };
+            _worldView.MouseDown += OnWorldViewMouseDown;
+            _worldView.MouseUp += OnWorldViewMouseUp;
+            _worldView.MouseMove += OnWorldViewMouseMove;
 
             Controls.Add(_worldView);
             Controls.Add(toolbar);
@@ -84,6 +87,7 @@ namespace Box2D.Viewer
             _world = session.World;
             _worldView.World = _world;
             _worldView.Invalidate();
+            _worldView.Focus();
         }
 
         private void StepWorld()
@@ -95,20 +99,27 @@ namespace Box2D.Viewer
 
             if (_testbed != null)
             {
+                _testbed.DebugDraw?.BeginFrame();
                 _testbed.Step(_testSettings);
+                _worldView.OverlayText = _testbed.DebugDraw?.GetTextSnapshot();
+                _worldView.DebugSegments = _testbed.DebugDraw?.GetSegmentSnapshot();
+                _worldView.DebugPoints = _testbed.DebugDraw?.GetPointSnapshot();
             }
             else
             {
                 _world.Step(1.0f / 60.0f, 8, 3);
+                _worldView.OverlayText = null;
+                _worldView.DebugSegments = null;
+                _worldView.DebugPoints = null;
             }
             _worldView.Invalidate();
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            base.OnKeyDown(e);
             if (_testbed == null)
             {
+                base.OnKeyDown(e);
                 return;
             }
 
@@ -121,9 +132,9 @@ namespace Box2D.Viewer
 
         protected override void OnKeyUp(KeyEventArgs e)
         {
-            base.OnKeyUp(e);
             if (_testbed == null)
             {
+                base.OnKeyUp(e);
                 return;
             }
 
@@ -132,6 +143,39 @@ namespace Box2D.Viewer
             {
                 _testbed.KeyboardUp(key);
             }
+        }
+
+        private void OnWorldViewMouseDown(object sender, MouseEventArgs e)
+        {
+            if (_testbed == null)
+            {
+                return;
+            }
+
+            b2Vec2 worldPoint = _worldView.ScreenToWorld(e.Location);
+            _testbed.MouseDown(worldPoint);
+        }
+
+        private void OnWorldViewMouseUp(object sender, MouseEventArgs e)
+        {
+            if (_testbed == null)
+            {
+                return;
+            }
+
+            b2Vec2 worldPoint = _worldView.ScreenToWorld(e.Location);
+            _testbed.MouseUp(worldPoint);
+        }
+
+        private void OnWorldViewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_testbed == null)
+            {
+                return;
+            }
+
+            b2Vec2 worldPoint = _worldView.ScreenToWorld(e.Location);
+            _testbed.MouseMove(worldPoint);
         }
 
         private static char ToTestbedKey(Keys keyCode)
