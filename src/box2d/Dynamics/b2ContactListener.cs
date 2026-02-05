@@ -17,17 +17,17 @@ namespace Box2D.Dynamics
     /// You should strive to make your callbacks efficient because there may be
     /// many callbacks per time step.
     /// @warning You cannot create/destroy Box2D entities inside these callbacks.    /// </summary>
-    public abstract class b2ContactListener
+    public interface b2ContactListener
     {
         /// <summary>
         /// Called when two fixtures begin to touch.
         /// </summary>
-        public virtual void BeginContact(b2Contact contact) { }
+        void BeginContact(b2Contact contact);
 
         /// <summary>
         /// Called when two fixtures cease to touch.
         /// </summary>
-        public virtual void EndContact(b2Contact contact) { }
+        void EndContact(b2Contact contact);
 
         /// <summary>
         /// This is called after a contact is updated. This allows you to inspect a
@@ -41,7 +41,7 @@ namespace Box2D.Dynamics
         /// get an EndContact callback. However, you may get a BeginContact callback
         /// the next step.
         /// </summary>
-        public abstract void PreSolve(b2Contact contact, b2Manifold oldManifold);
+        void PreSolve(b2Contact contact, b2Manifold oldManifold);
 
         /// <summary>
         /// This lets you inspect a contact after the solver is finished. This is useful
@@ -51,8 +51,14 @@ namespace Box2D.Dynamics
         /// in a separate data structure.
         /// Note: this is only called for contacts that are touching, solid, and awake.
         /// </summary>
-        public abstract void PostSolve(b2Contact contact, ref b2ContactImpulse impulse);
+        void PostSolve(b2Contact contact, ref b2ContactImpulse impulse);
+    }
 
-        public static b2ContactListener b2_defaultListener;
+    internal sealed class b2NullContactListener : b2ContactListener
+    {
+        public void BeginContact(b2Contact contact) { }
+        public void EndContact(b2Contact contact) { }
+        public void PreSolve(b2Contact contact, b2Manifold oldManifold) { }
+        public void PostSolve(b2Contact contact, ref b2ContactImpulse impulse) { }
     }
 }

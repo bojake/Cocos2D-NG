@@ -10,5 +10,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\box2d.csproj" />
+    <ProjectReference Include="..\Box2D.Tests\Box2D.Tests.csproj" />
   </ItemGroup>
 </Project>

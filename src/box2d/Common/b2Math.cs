@@ -89,7 +89,6 @@ namespace Box2D.Common
             return a.x * b.x + a.y * b.y;
         }
 
-        [Obsolete("Use the ref b2Dot instead")]
 #if AGGRESSIVE_INLINING
         [MethodImpl(MethodImplOptions.AggressiveInlining)] 
 #endif
@@ -115,7 +114,6 @@ namespace Box2D.Common
             return a.x * b.y - a.y * b.x;
         }
 
-        [Obsolete("Use the ref b2Cross")]
 #if AGGRESSIVE_INLINING
         [MethodImpl(MethodImplOptions.AggressiveInlining)] 
 #endif

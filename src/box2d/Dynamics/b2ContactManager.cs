@@ -20,7 +20,7 @@ namespace Box2D.Dynamics
             m_contactList = null;
             m_contactCount = 0;
             m_contactFilter = b2ContactFilter.b2_defaultFilter;
-            m_contactListener = b2ContactListener.b2_defaultListener;
+            m_contactListener = new b2NullContactListener();
 			m_broadPhase = new b2BroadPhase();
 
         }

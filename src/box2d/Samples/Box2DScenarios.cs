@@ -12,7 +12,7 @@ namespace Box2D
             b2World world = new b2World(new b2Vec2(0.0f, -10.0f));
 
             b2BodyDef groundDef = new b2BodyDef();
-            groundDef.position.Set(0.0f, -30.0f);
+            groundDef.position.Set(0.0f, -10.0f);
             b2Body ground = world.CreateBody(groundDef);
             b2PolygonShape groundShape = new b2PolygonShape();
             groundShape.SetAsBox(50.0f, 10.0f);
@@ -37,7 +37,7 @@ namespace Box2D
             }
 
             b2BodyDef pusherDef = new b2BodyDef();
-            pusherDef.type = b2BodyType.b2_dynamicBody;
+            pusherDef.type = b2BodyType.b2_kinematicBody;
             pusherDef.position.Set(-8.0f, 1.0f);
             pusher = world.CreateBody(pusherDef);
             b2PolygonShape pusherShape = new b2PolygonShape();
