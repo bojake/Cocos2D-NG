@@ -10,6 +10,16 @@ namespace Box2DNG.Viewer.Samples
 
         public override string Name => "Pinball";
 
+        public override WorldDef CreateWorldDef()
+        {
+            return new WorldDef()
+                .WithGravity(new Vec2(0f, -10f))
+                .EnableContinuousCollision(true)
+                .WithMaxSubSteps(16)
+                .WithVelocityIterations(20)
+                .WithPositionIterations(8);
+        }
+
         public override void Build(World world)
         {
             Body ground = world.CreateBody(new BodyDef().AsStatic().At(0f, 0f));

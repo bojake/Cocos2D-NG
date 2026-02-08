@@ -78,6 +78,12 @@ namespace Box2DNG
             Sweep = new Sweep(LocalCenter, center, center, angleRadians, angleRadians, 0f);
         }
 
+        internal void SetTransformFromSweep(Sweep sweep)
+        {
+            Transform = sweep.GetTransform(0f);
+            Sweep = sweep;
+        }
+
         public Vec2 GetWorldCenter() => Transform.P + Rot.Mul(Transform.Q, LocalCenter);
 
         public Vec2 GetLocalCenter() => LocalCenter;

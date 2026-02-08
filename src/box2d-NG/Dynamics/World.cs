@@ -24,6 +24,7 @@ namespace Box2DNG
         private readonly System.Collections.Generic.List<FrictionJoint> _frictionJoints = new System.Collections.Generic.List<FrictionJoint>();
         private float _prevTimeStep;
         private readonly SolverPipeline _solverPipeline;
+        private readonly ContactSolver _contactSolver;
         private bool _islandsDirty = true;
         private readonly System.Collections.Generic.HashSet<int> _dirtyIslandIds = new System.Collections.Generic.HashSet<int>();
         private readonly System.Collections.Generic.Dictionary<Body, int> _bodyIslandIds = new System.Collections.Generic.Dictionary<Body, int>();
@@ -32,6 +33,7 @@ namespace Box2DNG
         {
             _def = def ?? throw new ArgumentNullException(nameof(def));
             _solverPipeline = new SolverPipeline(this);
+            _contactSolver = new ContactSolver(this);
         }
 
         public Vec2 Gravity => _def.Gravity;
@@ -1103,6 +1105,33 @@ namespace Box2DNG
             _solverPipeline.Step(timeStep);
         }
 
+        internal void ResetSweeps()
+        {
+            for (int i = 0; i < _bodies.Count; ++i)
+            {
+                Body body = _bodies[i];
+                Vec2 center = body.GetWorldCenter();
+                float angle = body.Transform.Q.Angle;
+                body.Sweep = new Sweep(body.LocalCenter, center, center, angle, angle, 0f);
+            }
+        }
+
+        internal void SyncSweeps()
+        {
+            for (int i = 0; i < _bodies.Count; ++i)
+            {
+                Body body = _bodies[i];
+                if (body.Type == BodyType.Static)
+                {
+                    continue;
+                }
+
+                Vec2 center = body.GetWorldCenter();
+                float angle = body.Transform.Q.Angle;
+                body.Sweep = new Sweep(body.LocalCenter, body.Sweep.C0, center, body.Sweep.A0, angle, body.Sweep.Alpha0);
+            }
+        }
+
         private void RaiseContactImpulseEvents()
         {
             if (_awakeSet.Contacts.Count == 0)
@@ -1228,7 +1257,7 @@ namespace Box2DNG
                     {
                         useBlockSolver = true;
                     }
-                    else
+                    if (!useBlockSolver)
                     {
                         solvePointCount = 1;
                         PositionManifold pm0 = ComputePositionManifold(contact, bodyA.Transform, bodyB.Transform, radiusA, radiusB, 0);
@@ -1366,7 +1395,7 @@ namespace Box2DNG
                     Vec2 dv = vB - vA;
 
                     float vn = Vec2.Dot(dv, normal);
-                    float impulse = -(vn - sp.VelocityBias) * sp.NormalMass;
+                    float impulse = -(vn - sp.VelocityBias + sp.Bias + sp.Softness * mp.NormalImpulse) * sp.NormalMass;
                     float newNormalImpulse = MathF.Max(mp.NormalImpulse + impulse, 0f);
                     float appliedNormal = newNormalImpulse - mp.NormalImpulse;
                     Vec2 Pn = appliedNormal * normal;
@@ -1391,10 +1420,13 @@ namespace Box2DNG
                     Vec2 rA2 = sp2.RA;
                     Vec2 rB2 = sp2.RB;
 
-                    float invDet = 1f / det;
+                    float k11Soft = k11 + sp1.Softness;
+                    float k22Soft = k22 + sp2.Softness;
+                    float detSoft = k11Soft * k22Soft - k12 * k12;
+                    float invDet = detSoft != 0f ? 1f / detSoft : 0f;
                     Mat22 normalMass = new Mat22(
-                        new Vec2(invDet * k22, -invDet * k12),
-                        new Vec2(-invDet * k12, invDet * k11));
+                        new Vec2(invDet * k22Soft, -invDet * k12),
+                        new Vec2(-invDet * k12, invDet * k11Soft));
 
                     Vec2 vA1 = bodyA.LinearVelocity + Vec2.Cross(bodyA.AngularVelocity, rA1);
                     Vec2 vB1 = bodyB.LinearVelocity + Vec2.Cross(bodyB.AngularVelocity, rB1);
@@ -1404,15 +1436,15 @@ namespace Box2DNG
                     float vn1 = Vec2.Dot(vB1 - vA1, normal);
                     float vn2 = Vec2.Dot(vB2 - vA2, normal);
 
-                    float b1 = vn1 - sp1.VelocityBias;
-                    float b2 = vn2 - sp2.VelocityBias;
+                    float b1 = vn1 - sp1.VelocityBias + sp1.Bias + sp1.Softness * mp1.NormalImpulse;
+                    float b2 = vn2 - sp2.VelocityBias + sp2.Bias + sp2.Softness * mp2.NormalImpulse;
 
                     float ax = mp1.NormalImpulse;
                     float ay = mp2.NormalImpulse;
 
                     // Compute b' = b - K * a
-                    b1 -= k11 * ax + k12 * ay;
-                    b2 -= k12 * ax + k22 * ay;
+                    b1 -= k11Soft * ax + k12 * ay;
+                    b2 -= k12 * ax + k22Soft * ay;
 
                     // Case 1: both impulses positive
                     Vec2 x = -Mat22.Mul(normalMass, new Vec2(b1, b2));
@@ -1427,7 +1459,7 @@ namespace Box2DNG
                     }
 
                     // Case 2: x2 = 0
-                    float x1 = k11 > 0f ? -b1 / k11 : 0f;
+                    float x1 = k11Soft > 0f ? -b1 / k11Soft : 0f;
                     float vn2Case2 = k12 * x1 + b2;
                     if (x1 >= 0f && vn2Case2 >= 0f)
                     {
@@ -1440,7 +1472,7 @@ namespace Box2DNG
                     }
 
                     // Case 3: x1 = 0
-                    float x2 = k22 > 0f ? -b2 / k22 : 0f;
+                    float x2 = k22Soft > 0f ? -b2 / k22Soft : 0f;
                     float vn1Case3 = k12 * x2 + b1;
                     if (x2 >= 0f && vn1Case3 >= 0f)
                     {
@@ -1489,63 +1521,231 @@ namespace Box2DNG
             float timeStep = _prevTimeStep;
             int subSteps = _def.MaxSubSteps;
 
-            for (int i = 0; i < _contacts.Count; ++i)
+            if (timeStep <= 0f)
             {
-                Contact contact = _contacts[i];
-                Body? bodyA = contact.FixtureA?.Body;
-                Body? bodyB = contact.FixtureB?.Body;
+                return;
+            }
 
-                if (bodyA == null || bodyB == null)
+            System.Collections.Generic.HashSet<ContactKey> processed = new System.Collections.Generic.HashSet<ContactKey>();
+
+            foreach (Contact contact in _contactMap.Values)
+            {
+                if (contact.FixtureA == null || contact.FixtureB == null)
                 {
                     continue;
                 }
 
-                if (!bodyA.Definition.Bullet && !bodyB.Definition.Bullet)
+                processed.Add(new ContactKey(contact.FixtureA.ProxyId, contact.FixtureB.ProxyId));
+                ProcessTOI(contact, timeStep, subSteps);
+            }
+
+            for (int i = 0; i < _bodies.Count; ++i)
+            {
+                Body bulletBody = _bodies[i];
+                if (!bulletBody.Definition.Bullet || bulletBody.Type == BodyType.Static)
                 {
                     continue;
                 }
 
+                Vec2 translation = bulletBody.Sweep.C - bulletBody.Sweep.C0;
+                float minTranslation = MathF.Max(Constants.LinearSlop, 0.25f * bulletBody.Sweep.LocalCenter.Length);
+                if (translation.LengthSquared <= minTranslation * minTranslation)
+                {
+                    continue;
+                }
+
+                for (int f = 0; f < bulletBody.Fixtures.Count; ++f)
+                {
+                    Fixture fixture = bulletBody.Fixtures[f];
+                    if (fixture.IsSensor)
+                    {
+                        continue;
+                    }
+
+                    Transform startTransform = bulletBody.Sweep.GetTransform(0f);
+                    ShapeProxy proxy = BuildWorldProxy(fixture.Shape, startTransform);
+                    ShapeCastInput input = new ShapeCastInput(proxy, translation, 1f, false);
+                    _broadPhase.ShapeCast(otherId =>
+                    {
+                        Fixture? otherFixture = _broadPhase.GetUserData(otherId);
+                        if (otherFixture == null)
+                        {
+                            return 1f;
+                        }
+
+                        if (otherFixture == fixture)
+                        {
+                            return 1f;
+                        }
+
+                        if (otherFixture.IsSensor)
+                        {
+                            return 1f;
+                        }
+
+                        if (!ShouldCollide(fixture, otherFixture))
+                        {
+                            return 1f;
+                        }
+
+                        ContactKey key = new ContactKey(fixture.ProxyId, otherFixture.ProxyId);
+                        if (processed.Contains(key))
+                        {
+                            return 1f;
+                        }
+
+                        processed.Add(key);
+                        Contact temp = new Contact(fixture, otherFixture);
+                        temp.Update(fixture.Body.Transform, otherFixture.Body.Transform);
+                        ProcessTOI(temp, timeStep, subSteps);
+                        return 1f;
+                    }, input);
+                }
+            }
+        }
+
+        private void AdvanceBodyToTOI(Body body, float alpha)
+        {
+            if (body.Type == BodyType.Static)
+            {
+                return;
+            }
+
+            Sweep sweep = body.Sweep.Advance(alpha);
+            body.SetTransformFromSweep(sweep);
+        }
+
+        private void ProcessTOI(Contact contact, float timeStep, int subSteps)
+        {
+            Body? bodyA = contact.FixtureA?.Body;
+            Body? bodyB = contact.FixtureB?.Body;
+
+            if (bodyA == null || bodyB == null)
+            {
+                return;
+            }
+
+            if (contact.FixtureA!.IsSensor || contact.FixtureB!.IsSensor)
+            {
+                return;
+            }
+
+            if (bodyA.Type == BodyType.Static && bodyB.Type == BodyType.Static)
+            {
+                return;
+            }
+
+            if (bodyA.Type == BodyType.Kinematic && bodyB.Type == BodyType.Kinematic &&
+                !bodyA.Definition.Bullet && !bodyB.Definition.Bullet)
+            {
+                return;
+            }
+
+            if (contact.IsTouching && !bodyA.Definition.Bullet && !bodyB.Definition.Bullet)
+            {
+                return;
+            }
+
+            if (contact.ToiCount > _def.MaxSubSteps)
+            {
+                return;
+            }
+
+            bool collideA = bodyA.Definition.Bullet || bodyA.Type != BodyType.Dynamic;
+            bool collideB = bodyB.Definition.Bullet || bodyB.Type != BodyType.Dynamic;
+            if (!collideA && !collideB)
+            {
+                return;
+            }
+
+            float toi;
+            if (contact.HasToi)
+            {
+                toi = contact.Toi;
+            }
+            else
+            {
                 ShapeProxy proxyA = ShapeGeometry.ToProxy(contact.ShapeA);
                 ShapeProxy proxyB = ShapeGeometry.ToProxy(contact.ShapeB);
                 ToiInput toiInput = new ToiInput(proxyA, proxyB, bodyA.Sweep, bodyB.Sweep, 1f);
                 ToiOutput output = TimeOfImpact.Compute(toiInput);
 
-                if (output.State != ToiState.Hit || output.Fraction <= 0f || output.Fraction > 1f)
+                if (output.State == ToiState.Overlapped)
+                {
+                    toi = 0f;
+                }
+                else if (output.State != ToiState.Hit || output.Fraction <= 0f || output.Fraction > 1f)
+                {
+                    return;
+                }
+                else
+                {
+                    toi = output.Fraction;
+                }
+
+                contact.CacheToi(toi);
+            }
+
+            AdvanceBodyToTOI(bodyA, toi);
+            AdvanceBodyToTOI(bodyB, toi);
+
+            if (bodyA.Type != BodyType.Static)
+            {
+                bodyA.SetAwake(true);
+            }
+            if (bodyB.Type != BodyType.Static)
+            {
+                bodyB.SetAwake(true);
+            }
+
+            contact.Update(bodyA.Transform, bodyB.Transform);
+            if (contact.Manifold.PointCount == 0)
+            {
+                return;
+            }
+
+            float remaining = timeStep * (1f - toi);
+            if (remaining <= 0f)
+            {
+                return;
+            }
+
+            float subDt = remaining / subSteps;
+            for (int s = 0; s < subSteps; ++s)
+            {
+                IntegrateForTOI(bodyA, subDt);
+                IntegrateForTOI(bodyB, subDt);
+
+                contact.Update(bodyA.Transform, bodyB.Transform);
+                if (contact.Manifold.PointCount == 0)
                 {
                     continue;
                 }
 
-                float toi = output.Fraction;
-                float remaining = timeStep * (1f - toi);
-                if (remaining <= 0f)
+                PrepareContact(contact, subDt, 1f);
+                SolveContact(contact, warmStart: true);
+                for (int it = 0; it < _def.VelocityIterations; ++it)
                 {
-                    continue;
+                    SolveContact(contact, warmStart: false);
                 }
-
-                float subDt = remaining / subSteps;
-                for (int s = 0; s < subSteps; ++s)
+                for (int it = 0; it < _def.PositionIterations; ++it)
                 {
-                    IntegrateForTOI(bodyA, subDt);
-                    IntegrateForTOI(bodyB, subDt);
-
-                    contact.Update(bodyA.Transform, bodyB.Transform);
-                    if (contact.Manifold.PointCount == 0)
-                    {
-                        continue;
-                    }
-
-                    PrepareContact(contact, subDt, 1f);
-                    SolveContact(contact, warmStart: true);
-                    for (int it = 0; it < _def.VelocityIterations; ++it)
-                    {
-                        SolveContact(contact, warmStart: false);
-                    }
-                    for (int it = 0; it < _def.PositionIterations; ++it)
-                    {
-                        SolvePositionContact(contact);
-                    }
+                    SolvePositionContact(contact);
                 }
             }
+
+            contact.IncrementToiCount();
+        }
+
+        private static ShapeProxy BuildWorldProxy(Shape shape, Transform transform)
+        {
+            ShapeProxy localProxy = ShapeGeometry.ToProxy(shape);
+            Vec2[] points = new Vec2[localProxy.Count];
+            for (int i = 0; i < localProxy.Count; ++i)
+            {
+                points[i] = Transform.Mul(transform, localProxy.Points[i]);
+            }
+            return new ShapeProxy(points, localProxy.Count, localProxy.Radius);
         }
 
         private Body? FindBodyForShape(Shape shape)
@@ -1648,6 +1848,8 @@ namespace Box2DNG
                 float vn = Vec2.Dot(vB - vA, normal);
 
                 float velocityBias = 0f;
+                float softness = 0f;
+                float bias = 0f;
                 float restitution = MixRestitution(fixtureA, fixtureB);
                 if (vn < -_def.RestitutionThreshold)
                 {
@@ -1656,8 +1858,22 @@ namespace Box2DNG
                 if (_def.EnableContactSoftening)
                 {
                     float separation = Vec2.Dot((centerB + rB) - (centerA + rA), normal);
-                    float baumgarte = MathFng.Clamp(Constants.Baumgarte * (separation + Constants.LinearSlop) / timeStep, -Constants.MaxLinearCorrection, 0f);
-                    velocityBias -= baumgarte;
+                    if (_def.UseSoftConstraints)
+                    {
+                        ComputeContactSoftness(kNormal, timeStep, separation, out bias, out softness);
+                        if (softness > 0f)
+                        {
+                            normalMass = 1f / (kNormal + softness);
+                        }
+                    }
+                    else
+                    {
+                        float baumgarte = Constants.Baumgarte * (separation + Constants.LinearSlop) / timeStep;
+                        float maxBias = MathF.Max(_def.ContactSpeed, 0f);
+                        float legacyBias = MathFng.Clamp(baumgarte, -maxBias, 0f);
+                        float baumgarteClamped = MathFng.Clamp(legacyBias, -Constants.MaxLinearCorrection, 0f);
+                        velocityBias -= baumgarteClamped;
+                    }
                 }
 
                 contact.SolverPoints[p] = new SolverPoint
@@ -1666,7 +1882,9 @@ namespace Box2DNG
                     RB = rB,
                     NormalMass = normalMass,
                     TangentMass = tangentMass,
-                    VelocityBias = velocityBias
+                    VelocityBias = velocityBias,
+                    Softness = softness,
+                    Bias = bias
                 };
             }
         }
@@ -1733,7 +1951,7 @@ namespace Box2DNG
                     continue;
                 }
 
-                float impulse = -(vn - sp.VelocityBias) * sp.NormalMass;
+                float impulse = -(vn - sp.VelocityBias + sp.Bias + sp.Softness * mp.NormalImpulse) * sp.NormalMass;
                 float newNormalImpulse = MathF.Max(mp.NormalImpulse + impulse, 0f);
                 float appliedNormal = newNormalImpulse - mp.NormalImpulse;
                 Vec2 Pn = appliedNormal * normal;
@@ -1859,6 +2077,42 @@ namespace Box2DNG
         {
             float factor = MathF.Max(0f, 1f - timeStep * damping);
             return velocity * factor;
+        }
+
+        private void ComputeContactSoftness(float kNormal, float timeStep, float separation, out float bias, out float softness)
+        {
+            bias = 0f;
+            softness = 0f;
+
+            if (kNormal <= 0f)
+            {
+                return;
+            }
+
+            float hertz = _def.ContactHertz;
+            if (hertz <= 0f)
+            {
+                return;
+            }
+
+            float mass = 1f / kNormal;
+            float omega = 2f * MathFng.Pi * hertz;
+            float d = 2f * mass * _def.ContactDampingRatio * omega;
+            float k = mass * omega * omega;
+
+            float gamma = timeStep * (d + timeStep * k);
+            if (gamma > 0f)
+            {
+                gamma = 1f / gamma;
+            }
+
+            float c = MathF.Min(separation + Constants.LinearSlop, 0f);
+            bias = c * timeStep * k * gamma;
+
+            float maxBias = MathF.Max(_def.ContactSpeed, 0f);
+            bias = MathFng.Clamp(bias, -maxBias, 0f);
+
+            softness = gamma;
         }
 
         private float MixFriction(Fixture a, Fixture b)
@@ -2144,10 +2398,32 @@ namespace Box2DNG
                     float vn = Vec2.Dot(vB - vA, normal);
 
                     float velocityBias = 0f;
+                    float softness = 0f;
+                    float bias = 0f;
                     float restitution = MixRestitution(fixtureA, fixtureB);
                     if (vn < -_def.RestitutionThreshold)
                     {
                         velocityBias = -restitution * vn;
+                    }
+                    if (_def.EnableContactSoftening)
+                    {
+                        float separation = Vec2.Dot((centerB + rB) - (centerA + rA), normal);
+                        if (_def.UseSoftConstraints)
+                        {
+                            ComputeContactSoftness(kNormal, timeStep, separation, out bias, out softness);
+                            if (softness > 0f)
+                            {
+                                normalMass = 1f / (kNormal + softness);
+                            }
+                        }
+                        else
+                        {
+                            float baumgarte = Constants.Baumgarte * (separation + Constants.LinearSlop) / timeStep;
+                            float maxBias = MathF.Max(_def.ContactSpeed, 0f);
+                            float legacyBias = MathFng.Clamp(baumgarte, -maxBias, 0f);
+                            float baumgarteClamped = MathFng.Clamp(legacyBias, -Constants.MaxLinearCorrection, 0f);
+                            velocityBias -= baumgarteClamped;
+                        }
                     }
 
                     contact.SolverPoints[p] = new SolverPoint
@@ -2156,7 +2432,9 @@ namespace Box2DNG
                         RB = rB,
                         NormalMass = normalMass,
                         TangentMass = tangentMass,
-                        VelocityBias = velocityBias
+                        VelocityBias = velocityBias,
+                        Softness = softness,
+                        Bias = bias
                     };
                 }
             }

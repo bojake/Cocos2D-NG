@@ -18,6 +18,8 @@ namespace Box2DNG
                     return;
                 }
 
+                _world.ResetSweeps();
+
                 float dtRatio = _world._prevTimeStep > 0f ? timeStep / _world._prevTimeStep : 1f;
                 _world._prevTimeStep = timeStep;
 
@@ -33,6 +35,7 @@ namespace Box2DNG
                 _world.RaiseContactImpulseEvents();
                 IntegratePositions(timeStep);
                 SolvePositionConstraints(timeStep);
+                _world.SyncSweeps();
                 FinalizeStep(timeStep);
             }
 
@@ -109,7 +112,8 @@ namespace Box2DNG
 
             private void InitializeConstraints(float timeStep, float dtRatio)
             {
-                _world.PrepareContacts(timeStep, dtRatio, _world._awakeSet.Contacts);
+                _world._contactSolver.Prepare(timeStep, dtRatio, _world._awakeSet.Contacts);
+                _world._contactSolver.WarmStart();
 
                 for (int i = 0; i < _world._awakeSet.Joints.Count; ++i)
                 {
@@ -120,17 +124,18 @@ namespace Box2DNG
 
             private void SolveVelocityConstraints(float timeStep)
             {
-                _world.SolveContacts(timeStep, warmStart: true, _world._awakeSet.Contacts);
-
                 for (int iter = 0; iter < _world._def.VelocityIterations; ++iter)
                 {
-                    _world.SolveContacts(timeStep, warmStart: false, _world._awakeSet.Contacts);
+                    _world._contactSolver.SolveVelocity(useBias: true);
                     for (int i = 0; i < _world._awakeSet.Joints.Count; ++i)
                     {
                         JointHandle handle = _world._awakeSet.Joints[i];
                         SolveJointVelocityConstraints(handle, timeStep);
                     }
                 }
+
+                _world._contactSolver.ApplyRestitution(_world._def.RestitutionThreshold);
+                _world._contactSolver.StoreImpulses();
             }
 
             private void IntegratePositions(float timeStep)

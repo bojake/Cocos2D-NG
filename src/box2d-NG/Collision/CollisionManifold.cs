@@ -545,9 +545,48 @@ namespace Box2DNG
             Vec2 p1 = Transform.Mul(xfA, chain.Segment.Point1);
             Vec2 p2 = Transform.Mul(xfA, chain.Segment.Point2);
             Vec2 pointB = output.PointB;
-            Vec2 edge = p2 - p1;
-            float side = Vec2.Cross(edge, pointB - p1);
-            if (side > 0f)
+
+            Vec2 edge1 = p2 - p1;
+            if (edge1.LengthSquared <= Constants.Epsilon * Constants.Epsilon)
+            {
+                return false;
+            }
+
+            Vec2 edge1Dir = edge1.Normalize();
+            Vec2 normal1 = MathFng.RightPerp(edge1Dir);
+
+            const float convexTol = 0.01f;
+            bool behind0 = true;
+            bool behind2 = true;
+
+            Vec2 ghost1 = Transform.Mul(xfA, chain.Ghost1);
+            Vec2 edge0 = p1 - ghost1;
+            if (edge0.LengthSquared > Constants.Epsilon * Constants.Epsilon)
+            {
+                Vec2 edge0Dir = edge0.Normalize();
+                bool convex1 = Vec2.Cross(edge0Dir, edge1Dir) >= convexTol;
+                if (convex1)
+                {
+                    Vec2 normal0 = MathFng.RightPerp(edge0Dir);
+                    behind0 = Vec2.Dot(normal0, pointB - p1) < 0f;
+                }
+            }
+
+            Vec2 ghost2 = Transform.Mul(xfA, chain.Ghost2);
+            Vec2 edge2 = ghost2 - p2;
+            if (edge2.LengthSquared > Constants.Epsilon * Constants.Epsilon)
+            {
+                Vec2 edge2Dir = edge2.Normalize();
+                bool convex2 = Vec2.Cross(edge1Dir, edge2Dir) >= convexTol;
+                if (convex2)
+                {
+                    Vec2 normal2 = MathFng.RightPerp(edge2Dir);
+                    behind2 = Vec2.Dot(normal2, pointB - p2) < 0f;
+                }
+            }
+
+            bool behind1 = Vec2.Dot(normal1, pointB - p1) < 0f;
+            if (behind1 && behind0 && behind2)
             {
                 return false;
             }

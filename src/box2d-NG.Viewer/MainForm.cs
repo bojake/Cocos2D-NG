@@ -55,8 +55,8 @@ namespace Box2DNG.Viewer
                 float dt = (1f / 60f) / subSteps;
                 for (int i = 0; i < subSteps; ++i)
                 {
-                    _world.Step(dt);
                     _sample.Step(_world, dt);
+                    _world.Step(dt);
                 }
                 Invalidate();
             };

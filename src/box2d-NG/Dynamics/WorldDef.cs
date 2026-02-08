@@ -7,19 +7,20 @@ namespace Box2DNG
         public Vec2 Gravity { get; private set; } = new Vec2(0f, -10f);
         public float RestitutionThreshold { get; private set; } = 1f;
         public float HitEventThreshold { get; private set; } = 1f;
-        public float ContactHertz { get; private set; } = 60f;
-        public float ContactDampingRatio { get; private set; } = 0.7f;
-        public float ContactSpeed { get; private set; } = 3f;
+        public float ContactHertz { get; private set; } = 120f;
+        public float ContactDampingRatio { get; private set; } = 1f;
+        public float ContactSpeed { get; private set; } = 15f;
         public float MaximumLinearSpeed { get; private set; } = 1000f;
         public float MaximumAngularSpeed { get; private set; } = 50f;
         public float MaximumTranslation { get; private set; } = 2f;
         public float MaximumRotation { get; private set; } = 0.5f * MathF.PI;
         public bool EnableSleep { get; private set; } = true;
         public bool EnableContinuous { get; private set; } = true;
-        public bool EnableContactSoftening { get; private set; }
-        public int MaxSubSteps { get; private set; } = 8;
-        public int VelocityIterations { get; private set; } = 8;
-        public int PositionIterations { get; private set; } = 3;
+        public bool EnableContactSoftening { get; private set; } = true;
+        public bool UseSoftConstraints { get; private set; } = true;
+        public int MaxSubSteps { get; private set; } = 16;
+        public int VelocityIterations { get; private set; } = 12;
+        public int PositionIterations { get; private set; } = 6;
         public int WorkerCount { get; private set; } = 1;
         public object? UserData { get; private set; }
 
@@ -39,6 +40,7 @@ namespace Box2DNG
         public WorldDef EnableSleeping(bool enable) { EnableSleep = enable; return this; }
         public WorldDef EnableContinuousCollision(bool enable) { EnableContinuous = enable; return this; }
         public WorldDef EnableSoftening(bool enable) { EnableContactSoftening = enable; return this; }
+        public WorldDef UseSoftConstraintsSolver(bool enable) { UseSoftConstraints = enable; return this; }
         public WorldDef WithMaxSubSteps(int steps) { MaxSubSteps = Math.Max(1, steps); return this; }
         public WorldDef WithVelocityIterations(int iterations) { VelocityIterations = Math.Max(1, iterations); return this; }
         public WorldDef WithPositionIterations(int iterations) { PositionIterations = Math.Max(1, iterations); return this; }

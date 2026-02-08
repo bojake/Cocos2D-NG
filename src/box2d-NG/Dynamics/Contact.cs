@@ -15,6 +15,9 @@ namespace Box2DNG
         public SolverPoint[] SolverPoints { get; private set; } = Array.Empty<SolverPoint>();
         public bool IsTouching { get; private set; }
         public bool WasTouching { get; private set; }
+        public float Toi { get; private set; } = 1f;
+        public int ToiCount { get; private set; }
+        public bool HasToi { get; private set; }
 
         public Contact(Shape shapeA, Transform transformA, Shape shapeB, Transform transformB)
         {
@@ -49,7 +52,25 @@ namespace Box2DNG
             WarmStartFromOld();
             EnsureSolverPoints();
             IsTouching = Manifold.PointCount > 0;
+            if (!IsTouching)
+            {
+                Toi = 1f;
+                ToiCount = 0;
+                HasToi = false;
+            }
+            else
+            {
+                HasToi = false;
+            }
         }
+
+        public void CacheToi(float toi)
+        {
+            Toi = toi;
+            HasToi = true;
+        }
+
+        public void IncrementToiCount() => ToiCount++;
 
         private void CopyToOldManifold()
         {
@@ -93,6 +114,15 @@ namespace Box2DNG
                 SolverPoints = new SolverPoint[Manifold.PointCount];
             }
         }
+
+        internal SolverPoint[] EnsureSolverPoints(int count)
+        {
+            if (SolverPoints.Length < count)
+            {
+                SolverPoints = new SolverPoint[count];
+            }
+            return SolverPoints;
+        }
     }
 
     public struct SolverPoint
@@ -102,5 +132,7 @@ namespace Box2DNG
         public float NormalMass;
         public float TangentMass;
         public float VelocityBias;
+        public float Softness;
+        public float Bias;
     }
 }
