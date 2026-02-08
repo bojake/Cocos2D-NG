@@ -68,11 +68,12 @@ namespace Box2DNG.Tests
                 body.CreateFixture(new FixtureDef(shape).WithDensity(2f));
             }
 
-            float startAngle = crankBody.Transform.Q.Angle;
+            float accumulatedRotation = 0f;
             float maxAbsX = 0f;
             for (int i = 0; i < 240; ++i)
             {
                 world.Step(1f / 60f);
+                accumulatedRotation += crankBody.AngularVelocity * (1f / 60f);
                 float absX = MathF.Abs(pistonBody.Transform.P.X);
                 if (absX > maxAbsX)
                 {
@@ -80,8 +81,7 @@ namespace Box2DNG.Tests
                 }
             }
 
-            float angleDelta = crankBody.Transform.Q.Angle - startAngle;
-            Assert.IsTrue(angleDelta > 6f, $"Expected crank rotation, got {angleDelta} rad.");
+            Assert.IsTrue(accumulatedRotation > 6f, $"Expected crank rotation, got {accumulatedRotation} rad.");
             Assert.IsTrue(maxAbsX < 0.2f, $"Piston drifted off axis: {maxAbsX}");
         }
 

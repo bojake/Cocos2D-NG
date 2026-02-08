@@ -180,6 +180,11 @@ namespace Box2DNG
 
         public void SetAwake(bool awake)
         {
+            SetAwakeFromWorld(awake, notifyWorld: true);
+        }
+
+        internal void SetAwakeFromWorld(bool awake, bool notifyWorld)
+        {
             if (Type == BodyType.Static)
             {
                 Awake = false;
@@ -191,6 +196,10 @@ namespace Box2DNG
             if (awake)
             {
                 SleepTime = 0f;
+            }
+            if (notifyWorld)
+            {
+                _world.NotifyAwakeChanged(this);
             }
         }
 

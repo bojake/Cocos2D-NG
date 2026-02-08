@@ -2,7 +2,7 @@ using System;
 
 namespace Box2DNG
 {
-    public sealed class World
+    public sealed partial class World
     {
         private readonly WorldDef _def;
         private readonly WorldEvents _events = new WorldEvents();
@@ -23,10 +23,15 @@ namespace Box2DNG
         private readonly System.Collections.Generic.List<RopeJoint> _ropeJoints = new System.Collections.Generic.List<RopeJoint>();
         private readonly System.Collections.Generic.List<FrictionJoint> _frictionJoints = new System.Collections.Generic.List<FrictionJoint>();
         private float _prevTimeStep;
+        private readonly SolverPipeline _solverPipeline;
+        private bool _islandsDirty = true;
+        private readonly System.Collections.Generic.HashSet<int> _dirtyIslandIds = new System.Collections.Generic.HashSet<int>();
+        private readonly System.Collections.Generic.Dictionary<Body, int> _bodyIslandIds = new System.Collections.Generic.Dictionary<Body, int>();
 
         public World(WorldDef def)
         {
             _def = def ?? throw new ArgumentNullException(nameof(def));
+            _solverPipeline = new SolverPipeline(this);
         }
 
         public Vec2 Gravity => _def.Gravity;
@@ -46,6 +51,21 @@ namespace Box2DNG
         public System.Collections.Generic.IReadOnlyList<GearJoint> GearJoints => _gearJoints;
         public System.Collections.Generic.IReadOnlyList<RopeJoint> RopeJoints => _ropeJoints;
         public System.Collections.Generic.IReadOnlyList<FrictionJoint> FrictionJoints => _frictionJoints;
+        public System.Collections.Generic.IReadOnlyList<Island> LastIslands => _lastIslands;
+        public SolverSet AwakeSet => _awakeSet;
+        public SolverSet SleepingSet => _sleepingSet;
+        public int? GetIslandId(Body body)
+        {
+            if (_bodyIslandIds.TryGetValue(body, out int id))
+            {
+                return id;
+            }
+            return null;
+        }
+
+        private System.Collections.Generic.List<Island> _lastIslands = new System.Collections.Generic.List<Island>();
+        private readonly SolverSet _awakeSet = new SolverSet();
+        private readonly SolverSet _sleepingSet = new SolverSet();
 
         public Body CreateBody(BodyDef def)
         {
@@ -58,6 +78,9 @@ namespace Box2DNG
         {
             DistanceJoint joint = new DistanceJoint(def);
             _distanceJoints.Add(joint);
+            MarkIslandDirty(joint.BodyA);
+            MarkIslandDirty(joint.BodyB);
+            HandleJointCreationAwakeState(joint.BodyA, joint.BodyB);
             return joint;
         }
 
@@ -65,6 +88,9 @@ namespace Box2DNG
         {
             RevoluteJoint joint = new RevoluteJoint(def);
             _revoluteJoints.Add(joint);
+            MarkIslandDirty(joint.BodyA);
+            MarkIslandDirty(joint.BodyB);
+            HandleJointCreationAwakeState(joint.BodyA, joint.BodyB);
             return joint;
         }
 
@@ -72,6 +98,9 @@ namespace Box2DNG
         {
             PrismaticJoint joint = new PrismaticJoint(def);
             _prismaticJoints.Add(joint);
+            MarkIslandDirty(joint.BodyA);
+            MarkIslandDirty(joint.BodyB);
+            HandleJointCreationAwakeState(joint.BodyA, joint.BodyB);
             return joint;
         }
 
@@ -79,6 +108,9 @@ namespace Box2DNG
         {
             WheelJoint joint = new WheelJoint(def);
             _wheelJoints.Add(joint);
+            MarkIslandDirty(joint.BodyA);
+            MarkIslandDirty(joint.BodyB);
+            HandleJointCreationAwakeState(joint.BodyA, joint.BodyB);
             return joint;
         }
 
@@ -86,6 +118,9 @@ namespace Box2DNG
         {
             PulleyJoint joint = new PulleyJoint(def);
             _pulleyJoints.Add(joint);
+            MarkIslandDirty(joint.BodyA);
+            MarkIslandDirty(joint.BodyB);
+            HandleJointCreationAwakeState(joint.BodyA, joint.BodyB);
             return joint;
         }
 
@@ -93,6 +128,9 @@ namespace Box2DNG
         {
             WeldJoint joint = new WeldJoint(def);
             _weldJoints.Add(joint);
+            MarkIslandDirty(joint.BodyA);
+            MarkIslandDirty(joint.BodyB);
+            HandleJointCreationAwakeState(joint.BodyA, joint.BodyB);
             return joint;
         }
 
@@ -100,6 +138,9 @@ namespace Box2DNG
         {
             MotorJoint joint = new MotorJoint(def);
             _motorJoints.Add(joint);
+            MarkIslandDirty(joint.BodyA);
+            MarkIslandDirty(joint.BodyB);
+            HandleJointCreationAwakeState(joint.BodyA, joint.BodyB);
             return joint;
         }
 
@@ -107,6 +148,9 @@ namespace Box2DNG
         {
             GearJoint joint = new GearJoint(def);
             _gearJoints.Add(joint);
+            MarkIslandDirty(joint.BodyA);
+            MarkIslandDirty(joint.BodyB);
+            HandleJointCreationAwakeState(joint.BodyA, joint.BodyB);
             return joint;
         }
 
@@ -114,6 +158,9 @@ namespace Box2DNG
         {
             RopeJoint joint = new RopeJoint(def);
             _ropeJoints.Add(joint);
+            MarkIslandDirty(joint.BodyA);
+            MarkIslandDirty(joint.BodyB);
+            HandleJointCreationAwakeState(joint.BodyA, joint.BodyB);
             return joint;
         }
 
@@ -121,8 +168,587 @@ namespace Box2DNG
         {
             FrictionJoint joint = new FrictionJoint(def);
             _frictionJoints.Add(joint);
+            MarkIslandDirty(joint.BodyA);
+            MarkIslandDirty(joint.BodyB);
+            HandleJointCreationAwakeState(joint.BodyA, joint.BodyB);
             return joint;
         }
+
+        public bool DestroyJoint(DistanceJoint joint) => RemoveJoint(_distanceJoints, joint);
+        public bool DestroyJoint(RevoluteJoint joint) => RemoveJoint(_revoluteJoints, joint);
+        public bool DestroyJoint(PrismaticJoint joint) => RemoveJoint(_prismaticJoints, joint);
+        public bool DestroyJoint(WheelJoint joint) => RemoveJoint(_wheelJoints, joint);
+        public bool DestroyJoint(PulleyJoint joint) => RemoveJoint(_pulleyJoints, joint);
+        public bool DestroyJoint(WeldJoint joint) => RemoveJoint(_weldJoints, joint);
+        public bool DestroyJoint(MotorJoint joint) => RemoveJoint(_motorJoints, joint);
+        public bool DestroyJoint(GearJoint joint) => RemoveJoint(_gearJoints, joint);
+        public bool DestroyJoint(RopeJoint joint) => RemoveJoint(_ropeJoints, joint);
+        public bool DestroyJoint(FrictionJoint joint) => RemoveJoint(_frictionJoints, joint);
+
+        private bool RemoveJoint<TJoint>(System.Collections.Generic.List<TJoint> joints, TJoint joint) where TJoint : class
+        {
+            int index = joints.IndexOf(joint);
+            bool removed = joints.Remove(joint);
+            if (removed)
+            {
+                Body bodyA = GetJointBodyA(joint);
+                Body bodyB = GetJointBodyB(joint);
+                MarkIslandDirty(bodyA);
+                MarkIslandDirty(bodyB);
+                if (index >= 0)
+                {
+                    RemoveJointFromSolverSets(GetJointType(joint), index);
+                }
+                _islandsDirty = true;
+            }
+            return removed;
+        }
+
+        internal void NotifyAwakeChanged(Body body)
+        {
+            if (body.Type == BodyType.Static)
+            {
+                return;
+            }
+
+            MarkIslandDirty(body);
+
+            if (body.Awake)
+            {
+                if (_sleepingSet.Bodies.Remove(body))
+                {
+                    if (!_awakeSet.Bodies.Contains(body))
+                    {
+                        _awakeSet.Bodies.Add(body);
+                    }
+                }
+                else if (!_awakeSet.Bodies.Contains(body))
+                {
+                    _awakeSet.Bodies.Add(body);
+                }
+
+                if (_bodyIslandIds.TryGetValue(body, out int islandId) && islandId >= 0 && islandId < _lastIslands.Count)
+                {
+                    Island island = _lastIslands[islandId];
+                    if (!island.IsAwake)
+                    {
+                        island.IsAwake = true;
+                        MoveIslandBetweenSets(island, _sleepingSet, _awakeSet);
+                        for (int i = 0; i < island.Bodies.Count; ++i)
+                        {
+                            Body islandBody = island.Bodies[i];
+                            if (islandBody.Type == BodyType.Static)
+                            {
+                                continue;
+                            }
+                            if (!islandBody.Awake)
+                            {
+                                islandBody.SetAwakeFromWorld(true, notifyWorld: false);
+                            }
+                            if (!_awakeSet.Bodies.Contains(islandBody))
+                            {
+                                _awakeSet.Bodies.Add(islandBody);
+                            }
+                            _sleepingSet.Bodies.Remove(islandBody);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (_awakeSet.Bodies.Remove(body))
+                {
+                    if (!_sleepingSet.Bodies.Contains(body))
+                    {
+                        _sleepingSet.Bodies.Add(body);
+                    }
+                }
+                else if (!_sleepingSet.Bodies.Contains(body))
+                {
+                    _sleepingSet.Bodies.Add(body);
+                }
+
+                if (_bodyIslandIds.TryGetValue(body, out int islandId) && islandId >= 0 && islandId < _lastIslands.Count)
+                {
+                    Island island = _lastIslands[islandId];
+                    if (island.IsAwake)
+                    {
+                        island.IsAwake = false;
+                        MoveIslandBetweenSets(island, _awakeSet, _sleepingSet);
+                    }
+                }
+            }
+
+            _islandsDirty = true;
+        }
+
+        private void MarkIslandDirty(Body body)
+        {
+            if (_bodyIslandIds.TryGetValue(body, out int islandId))
+            {
+                _dirtyIslandIds.Add(islandId);
+            }
+            _islandsDirty = true;
+        }
+
+        public System.Collections.Generic.IReadOnlyList<Island> BuildIslands(bool awakeOnly = true)
+        {
+            if (!_islandsDirty && _lastIslands.Count > 0)
+            {
+                return _lastIslands;
+            }
+
+            _islandsDirty = false;
+            _awakeSet.Bodies.Clear();
+            _awakeSet.Islands.Clear();
+            _awakeSet.Contacts.Clear();
+            _awakeSet.Joints.Clear();
+            _sleepingSet.Bodies.Clear();
+            _sleepingSet.Islands.Clear();
+            _sleepingSet.Contacts.Clear();
+            _sleepingSet.Joints.Clear();
+            _bodyIslandIds.Clear();
+            _dirtyIslandIds.Clear();
+
+            System.Collections.Generic.Dictionary<Body, int> bodyIndex = new System.Collections.Generic.Dictionary<Body, int>(_bodies.Count);
+            for (int i = 0; i < _bodies.Count; ++i)
+            {
+                bodyIndex[_bodies[i]] = i;
+                Body body = _bodies[i];
+                if (body.Type == BodyType.Static)
+                {
+                    continue;
+                }
+                if (_def.EnableSleep && body.Awake == false)
+                {
+                    _sleepingSet.Bodies.Add(body);
+                }
+                else
+                {
+                    _awakeSet.Bodies.Add(body);
+                }
+            }
+
+            System.Collections.Generic.List<int>[] bodyContacts = new System.Collections.Generic.List<int>[_bodies.Count];
+            System.Collections.Generic.List<JointHandle>[] bodyJoints = new System.Collections.Generic.List<JointHandle>[_bodies.Count];
+
+            for (int i = 0; i < _bodies.Count; ++i)
+            {
+                bodyContacts[i] = new System.Collections.Generic.List<int>();
+                bodyJoints[i] = new System.Collections.Generic.List<JointHandle>();
+            }
+
+            for (int i = 0; i < _contacts.Count; ++i)
+            {
+                Contact contact = _contacts[i];
+                Fixture? fixtureA = contact.FixtureA;
+                Fixture? fixtureB = contact.FixtureB;
+                if (fixtureA == null || fixtureB == null)
+                {
+                    continue;
+                }
+                if (fixtureA.IsSensor || fixtureB.IsSensor)
+                {
+                    continue;
+                }
+                if (contact.Manifold.PointCount == 0)
+                {
+                    continue;
+                }
+
+                int ia = bodyIndex[fixtureA.Body];
+                int ib = bodyIndex[fixtureB.Body];
+                bodyContacts[ia].Add(i);
+                bodyContacts[ib].Add(i);
+            }
+
+            AddJointHandles(bodyJoints, bodyIndex, _distanceJoints, JointType.Distance);
+            AddJointHandles(bodyJoints, bodyIndex, _revoluteJoints, JointType.Revolute);
+            AddJointHandles(bodyJoints, bodyIndex, _prismaticJoints, JointType.Prismatic);
+            AddJointHandles(bodyJoints, bodyIndex, _wheelJoints, JointType.Wheel);
+            AddJointHandles(bodyJoints, bodyIndex, _pulleyJoints, JointType.Pulley);
+            AddJointHandles(bodyJoints, bodyIndex, _weldJoints, JointType.Weld);
+            AddJointHandles(bodyJoints, bodyIndex, _motorJoints, JointType.Motor);
+            AddJointHandles(bodyJoints, bodyIndex, _gearJoints, JointType.Gear);
+            AddJointHandles(bodyJoints, bodyIndex, _ropeJoints, JointType.Rope);
+            AddJointHandles(bodyJoints, bodyIndex, _frictionJoints, JointType.Friction);
+
+            bool[] bodyVisited = new bool[_bodies.Count];
+            bool[] contactAdded = new bool[_contacts.Count];
+            System.Collections.Generic.Dictionary<JointHandle, bool> jointAdded = new System.Collections.Generic.Dictionary<JointHandle, bool>();
+
+            System.Collections.Generic.List<Island> islands = new System.Collections.Generic.List<Island>();
+            System.Collections.Generic.Stack<int> stack = new System.Collections.Generic.Stack<int>();
+            int islandId = 0;
+
+            for (int i = 0; i < _bodies.Count; ++i)
+            {
+                Body body = _bodies[i];
+                if (body.Type == BodyType.Static)
+                {
+                    continue;
+                }
+                if (bodyVisited[i])
+                {
+                    continue;
+                }
+
+                Island island = new Island();
+                stack.Push(i);
+                bodyVisited[i] = true;
+
+                while (stack.Count > 0)
+                {
+                    int bodyIndexValue = stack.Pop();
+                    Body node = _bodies[bodyIndexValue];
+                    island.Bodies.Add(node);
+                    if (!_bodyIslandIds.ContainsKey(node))
+                    {
+                        _bodyIslandIds[node] = islandId;
+                    }
+
+                    foreach (int contactIndex in bodyContacts[bodyIndexValue])
+                    {
+                        if (!contactAdded[contactIndex])
+                        {
+                            contactAdded[contactIndex] = true;
+                            island.Contacts.Add(_contacts[contactIndex]);
+                        }
+
+                        Contact contact = _contacts[contactIndex];
+                        Fixture? fixtureA = contact.FixtureA;
+                        Fixture? fixtureB = contact.FixtureB;
+                        if (fixtureA == null || fixtureB == null)
+                        {
+                            continue;
+                        }
+
+                        int otherIndex = fixtureA.Body == node ? bodyIndex[fixtureB.Body] : bodyIndex[fixtureA.Body];
+                        Body otherBody = _bodies[otherIndex];
+                        if (otherBody.Type == BodyType.Static)
+                        {
+                            continue;
+                        }
+                        if (bodyVisited[otherIndex])
+                        {
+                            continue;
+                        }
+
+                        bodyVisited[otherIndex] = true;
+                        stack.Push(otherIndex);
+                    }
+
+                    foreach (JointHandle handle in bodyJoints[bodyIndexValue])
+                    {
+                        if (!jointAdded.ContainsKey(handle))
+                        {
+                            jointAdded[handle] = true;
+                            island.Joints.Add(handle);
+                        }
+
+                        Body? otherBody = GetJointOtherBody(handle, node);
+                        if (otherBody == null)
+                        {
+                            continue;
+                        }
+                        if (otherBody.Type == BodyType.Static)
+                        {
+                            continue;
+                        }
+                        int otherIndex = bodyIndex[otherBody];
+                        if (bodyVisited[otherIndex])
+                        {
+                            continue;
+                        }
+
+                        bodyVisited[otherIndex] = true;
+                        stack.Push(otherIndex);
+                    }
+                }
+
+                if (island.Bodies.Count > 0)
+                {
+                    bool islandAwake = !_def.EnableSleep;
+                    if (_def.EnableSleep)
+                    {
+                        for (int j = 0; j < island.Bodies.Count; ++j)
+                        {
+                            if (island.Bodies[j].Awake)
+                            {
+                                islandAwake = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    island.IsAwake = islandAwake;
+                    islands.Add(island);
+                    if (islandAwake)
+                    {
+                        AddIslandToSet(island, _awakeSet);
+                    }
+                    else
+                    {
+                        AddIslandToSet(island, _sleepingSet);
+                    }
+                    islandId++;
+                }
+            }
+
+            _lastIslands = islands;
+            return islands;
+        }
+
+        private static void AddJointHandles<TJoint>(
+            System.Collections.Generic.List<JointHandle>[] bodyJoints,
+            System.Collections.Generic.Dictionary<Body, int> bodyIndex,
+            System.Collections.Generic.List<TJoint> joints,
+            JointType type) where TJoint : class
+        {
+            for (int i = 0; i < joints.Count; ++i)
+            {
+                TJoint joint = joints[i];
+                Body bodyA = GetJointBodyA(joint);
+                Body bodyB = GetJointBodyB(joint);
+                int ia = bodyIndex[bodyA];
+                int ib = bodyIndex[bodyB];
+                JointHandle handle = new JointHandle(type, i);
+                bodyJoints[ia].Add(handle);
+                bodyJoints[ib].Add(handle);
+            }
+        }
+
+        private static Body GetJointBodyA(object joint)
+        {
+            return joint switch
+            {
+                DistanceJoint j => j.BodyA,
+                RevoluteJoint j => j.BodyA,
+                PrismaticJoint j => j.BodyA,
+                WheelJoint j => j.BodyA,
+                PulleyJoint j => j.BodyA,
+                WeldJoint j => j.BodyA,
+                MotorJoint j => j.BodyA,
+                GearJoint j => j.BodyA,
+                RopeJoint j => j.BodyA,
+                FrictionJoint j => j.BodyA,
+                _ => throw new System.InvalidOperationException("Unknown joint type.")
+            };
+        }
+
+        private static Body GetJointBodyB(object joint)
+        {
+            return joint switch
+            {
+                DistanceJoint j => j.BodyB,
+                RevoluteJoint j => j.BodyB,
+                PrismaticJoint j => j.BodyB,
+                WheelJoint j => j.BodyB,
+                PulleyJoint j => j.BodyB,
+                WeldJoint j => j.BodyB,
+                MotorJoint j => j.BodyB,
+                GearJoint j => j.BodyB,
+                RopeJoint j => j.BodyB,
+                FrictionJoint j => j.BodyB,
+                _ => throw new System.InvalidOperationException("Unknown joint type.")
+            };
+        }
+
+        private void HandleJointCreationAwakeState(Body bodyA, Body bodyB)
+        {
+            if (!_def.EnableSleep)
+            {
+                return;
+            }
+
+            if (bodyA.Type == BodyType.Static && bodyB.Type == BodyType.Static)
+            {
+                return;
+            }
+
+            bool awakeA = bodyA.Type != BodyType.Static && bodyA.Awake;
+            bool awakeB = bodyB.Type != BodyType.Static && bodyB.Awake;
+
+            if (awakeA && !awakeB)
+            {
+                bodyB.SetAwake(true);
+                return;
+            }
+
+            if (!awakeA && awakeB)
+            {
+                bodyA.SetAwake(true);
+                return;
+            }
+
+            if (!awakeA && !awakeB)
+            {
+                MergeSleepingIslands(bodyA, bodyB);
+            }
+        }
+
+        private void MergeSleepingIslands(Body bodyA, Body bodyB)
+        {
+            BuildIslands(awakeOnly: false);
+
+            if (!_bodyIslandIds.TryGetValue(bodyA, out int islandAId) ||
+                !_bodyIslandIds.TryGetValue(bodyB, out int islandBId) ||
+                islandAId == islandBId ||
+                islandAId < 0 || islandBId < 0 ||
+                islandAId >= _lastIslands.Count || islandBId >= _lastIslands.Count)
+            {
+                return;
+            }
+
+            Island islandA = _lastIslands[islandAId];
+            Island islandB = _lastIslands[islandBId];
+
+            if (islandA.IsAwake || islandB.IsAwake)
+            {
+                return;
+            }
+
+            Island primary = islandA.Bodies.Count >= islandB.Bodies.Count ? islandA : islandB;
+            Island secondary = primary == islandA ? islandB : islandA;
+
+            RemoveIslandFromSet(secondary, _sleepingSet);
+            _lastIslands.Remove(secondary);
+
+            for (int i = 0; i < secondary.Bodies.Count; ++i)
+            {
+                Body body = secondary.Bodies[i];
+                primary.Bodies.Add(body);
+            }
+
+            for (int i = 0; i < secondary.Contacts.Count; ++i)
+            {
+                Contact contact = secondary.Contacts[i];
+                primary.Contacts.Add(contact);
+            }
+
+            for (int i = 0; i < secondary.Joints.Count; ++i)
+            {
+                JointHandle handle = secondary.Joints[i];
+                primary.Joints.Add(handle);
+            }
+
+            AddIslandToSet(primary, _sleepingSet);
+            RebuildIslandIds();
+        }
+
+        private void RebuildIslandIds()
+        {
+            _bodyIslandIds.Clear();
+            for (int i = 0; i < _lastIslands.Count; ++i)
+            {
+                Island island = _lastIslands[i];
+                for (int j = 0; j < island.Bodies.Count; ++j)
+                {
+                    _bodyIslandIds[island.Bodies[j]] = i;
+                }
+            }
+        }
+
+        private void AddIslandToSet(Island island, SolverSet set)
+        {
+            if (!set.Islands.Contains(island))
+            {
+                set.Islands.Add(island);
+            }
+
+            for (int i = 0; i < island.Contacts.Count; ++i)
+            {
+                Contact contact = island.Contacts[i];
+                if (!set.Contacts.Contains(contact))
+                {
+                    set.Contacts.Add(contact);
+                }
+            }
+
+            for (int i = 0; i < island.Joints.Count; ++i)
+            {
+                JointHandle handle = island.Joints[i];
+                if (!set.Joints.Contains(handle))
+                {
+                    set.Joints.Add(handle);
+                }
+            }
+        }
+
+        private void RemoveIslandFromSet(Island island, SolverSet set)
+        {
+            set.Islands.Remove(island);
+
+            for (int i = 0; i < island.Contacts.Count; ++i)
+            {
+                set.Contacts.Remove(island.Contacts[i]);
+            }
+
+            for (int i = 0; i < island.Joints.Count; ++i)
+            {
+                set.Joints.Remove(island.Joints[i]);
+            }
+        }
+
+        private void RemoveJointFromSolverSets(JointType type, int index)
+        {
+            JointHandle handle = new JointHandle(type, index);
+            _awakeSet.Joints.Remove(handle);
+            _sleepingSet.Joints.Remove(handle);
+        }
+
+        private static JointType GetJointType(object joint)
+        {
+            return joint switch
+            {
+                DistanceJoint => JointType.Distance,
+                RevoluteJoint => JointType.Revolute,
+                PrismaticJoint => JointType.Prismatic,
+                WheelJoint => JointType.Wheel,
+                PulleyJoint => JointType.Pulley,
+                WeldJoint => JointType.Weld,
+                MotorJoint => JointType.Motor,
+                GearJoint => JointType.Gear,
+                RopeJoint => JointType.Rope,
+                FrictionJoint => JointType.Friction,
+                _ => throw new System.InvalidOperationException("Unknown joint type.")
+            };
+        }
+
+        private void MoveIslandBetweenSets(Island island, SolverSet source, SolverSet target)
+        {
+            RemoveIslandFromSet(island, source);
+            AddIslandToSet(island, target);
+        }
+
+        private Body? GetJointOtherBody(JointHandle handle, Body body)
+        {
+            return handle.Type switch
+            {
+                JointType.Distance => GetOtherBody(_distanceJoints[handle.Index], body),
+                JointType.Revolute => GetOtherBody(_revoluteJoints[handle.Index], body),
+                JointType.Prismatic => GetOtherBody(_prismaticJoints[handle.Index], body),
+                JointType.Wheel => GetOtherBody(_wheelJoints[handle.Index], body),
+                JointType.Pulley => GetOtherBody(_pulleyJoints[handle.Index], body),
+                JointType.Weld => GetOtherBody(_weldJoints[handle.Index], body),
+                JointType.Motor => GetOtherBody(_motorJoints[handle.Index], body),
+                JointType.Gear => GetOtherBody(_gearJoints[handle.Index], body),
+                JointType.Rope => GetOtherBody(_ropeJoints[handle.Index], body),
+                JointType.Friction => GetOtherBody(_frictionJoints[handle.Index], body),
+                _ => null
+            };
+        }
+
+        private static Body GetOtherBody(DistanceJoint joint, Body body) => joint.BodyA == body ? joint.BodyB : joint.BodyA;
+        private static Body GetOtherBody(RevoluteJoint joint, Body body) => joint.BodyA == body ? joint.BodyB : joint.BodyA;
+        private static Body GetOtherBody(PrismaticJoint joint, Body body) => joint.BodyA == body ? joint.BodyB : joint.BodyA;
+        private static Body GetOtherBody(WheelJoint joint, Body body) => joint.BodyA == body ? joint.BodyB : joint.BodyA;
+        private static Body GetOtherBody(PulleyJoint joint, Body body) => joint.BodyA == body ? joint.BodyB : joint.BodyA;
+        private static Body GetOtherBody(WeldJoint joint, Body body) => joint.BodyA == body ? joint.BodyB : joint.BodyA;
+        private static Body GetOtherBody(MotorJoint joint, Body body) => joint.BodyA == body ? joint.BodyB : joint.BodyA;
+        private static Body GetOtherBody(GearJoint joint, Body body) => joint.BodyA == body ? joint.BodyB : joint.BodyA;
+        private static Body GetOtherBody(RopeJoint joint, Body body) => joint.BodyA == body ? joint.BodyB : joint.BodyA;
+        private static Body GetOtherBody(FrictionJoint joint, Body body) => joint.BodyA == body ? joint.BodyB : joint.BodyA;
 
         internal Fixture CreateFixture(Body body, Shape shape)
         {
@@ -320,6 +946,7 @@ namespace Box2DNG
 
         public void UpdateContacts()
         {
+            bool contactsChanged = false;
             for (int i = 0; i < _bodies.Count; ++i)
             {
                 Body body = _bodies[i];
@@ -337,6 +964,8 @@ namespace Box2DNG
             }
 
             _contacts.Clear();
+            _awakeSet.Contacts.Clear();
+            _sleepingSet.Contacts.Clear();
             System.Collections.Generic.HashSet<ContactKey> seen = new System.Collections.Generic.HashSet<ContactKey>();
             System.Collections.Generic.HashSet<ContactKey> sensorSeen = new System.Collections.Generic.HashSet<ContactKey>();
 
@@ -381,6 +1010,7 @@ namespace Box2DNG
                     contact = new Contact(fixtureA, fixtureB);
                     contact.Evaluate();
                     _contactMap[contactKey] = contact;
+                    contactsChanged = true;
                 }
                 else
                 {
@@ -398,27 +1028,65 @@ namespace Box2DNG
                             bodyA.SetAwake(true);
                             bodyB.SetAwake(true);
                         }
+                        else if (_def.EnableSleep)
+                        {
+                            MergeSleepingIslands(bodyA, bodyB);
+                        }
                     }
                 }
 
                 if (contact.IsTouching && !contact.WasTouching)
                 {
                     beginEvents.Add(new ContactBeginEvent(fixtureA.UserData, fixtureB.UserData));
+                    contactsChanged = true;
+                    MarkIslandDirty(fixtureA.Body);
+                    MarkIslandDirty(fixtureB.Body);
                 }
                 else if (!contact.IsTouching && contact.WasTouching)
                 {
                     endEvents.Add(new ContactEndEvent(fixtureA.UserData, fixtureB.UserData));
+                    contactsChanged = true;
+                    MarkIslandDirty(fixtureA.Body);
+                    MarkIslandDirty(fixtureB.Body);
                 }
 
                 if (contact.Manifold.PointCount > 0)
                 {
                     _contacts.Add(contact);
+                    if (_def.EnableSleep &&
+                        fixtureA.Body.Type != BodyType.Static &&
+                        fixtureB.Body.Type != BodyType.Static)
+                    {
+                        bool awake = fixtureA.Body.Awake || fixtureB.Body.Awake;
+                        if (awake)
+                        {
+                            _awakeSet.Contacts.Add(contact);
+                        }
+                        else
+                        {
+                            _sleepingSet.Contacts.Add(contact);
+                        }
+                    }
+                    else
+                    {
+                        _awakeSet.Contacts.Add(contact);
+                    }
                     AddHitEvent(contact, hitEvents);
                 }
             });
 
+            int previousCount = _contactMap.Count;
             RemoveStaleContacts(seen, endEvents);
+            if (_contactMap.Count != previousCount)
+            {
+                contactsChanged = true;
+            }
             RemoveStaleSensors(sensorSeen, sensorEndEvents);
+
+            if (contactsChanged)
+            {
+                _islandsDirty = true;
+            }
 
             if (beginEvents.Count > 0 || endEvents.Count > 0 || hitEvents.Count > 0)
             {
@@ -432,262 +1100,20 @@ namespace Box2DNG
 
         public void Step(float timeStep)
         {
-            if (timeStep <= 0f)
-            {
-                return;
-            }
-
-            float dtRatio = _prevTimeStep > 0f ? timeStep / _prevTimeStep : 1f;
-            _prevTimeStep = timeStep;
-
-            for (int i = 0; i < _bodies.Count; ++i)
-            {
-                Body body = _bodies[i];
-                if (body.Type == BodyType.Static)
-                {
-                    continue;
-                }
-
-                if (_def.EnableSleep && body.AllowSleep == false)
-                {
-                    body.SetAwake(true);
-                }
-
-                if (_def.EnableSleep && body.Awake == false)
-                {
-                    continue;
-                }
-
-                if (body.Type == BodyType.Dynamic)
-                {
-                    Vec2 accel = body.GravityScale * Gravity;
-                    if (body.InverseMass > 0f)
-                    {
-                        accel += body.InverseMass * body.Force;
-                    }
-                    body.LinearVelocity += timeStep * accel;
-                    if (body.InverseInertia > 0f)
-                    {
-                        body.AngularVelocity += timeStep * body.InverseInertia * body.Torque;
-                    }
-                    body.LinearVelocity = ApplyLinearDamping(body.LinearVelocity, body.LinearDamping, timeStep);
-                    body.AngularVelocity = ApplyAngularDamping(body.AngularVelocity, body.AngularDamping, timeStep);
-
-                    if ((body.MotionLocks & MotionLocks.LinearX) != 0)
-                    {
-                        body.LinearVelocity = new Vec2(0f, body.LinearVelocity.Y);
-                    }
-                    if ((body.MotionLocks & MotionLocks.LinearY) != 0)
-                    {
-                        body.LinearVelocity = new Vec2(body.LinearVelocity.X, 0f);
-                    }
-                    if ((body.MotionLocks & MotionLocks.AngularZ) != 0)
-                    {
-                        body.AngularVelocity = 0f;
-                    }
-                }
-
-                body.LinearVelocity = ClampLinearSpeed(body.LinearVelocity, _def.MaximumLinearSpeed);
-                body.AngularVelocity = ClampAngularSpeed(body.AngularVelocity, _def.MaximumAngularSpeed);
-                body.ClearForces();
-            }
-
-            UpdateContacts();
-            PrepareContacts(timeStep, dtRatio);
-            for (int i = 0; i < _distanceJoints.Count; ++i)
-            {
-                _distanceJoints[i].InitVelocityConstraints(timeStep);
-            }
-            for (int i = 0; i < _revoluteJoints.Count; ++i)
-            {
-                _revoluteJoints[i].InitVelocityConstraints(timeStep);
-            }
-            for (int i = 0; i < _prismaticJoints.Count; ++i)
-            {
-                _prismaticJoints[i].InitVelocityConstraints(timeStep);
-            }
-            for (int i = 0; i < _wheelJoints.Count; ++i)
-            {
-                _wheelJoints[i].InitVelocityConstraints(timeStep);
-            }
-            for (int i = 0; i < _pulleyJoints.Count; ++i)
-            {
-                _pulleyJoints[i].InitVelocityConstraints(timeStep);
-            }
-            for (int i = 0; i < _weldJoints.Count; ++i)
-            {
-                _weldJoints[i].InitVelocityConstraints(timeStep);
-            }
-            for (int i = 0; i < _motorJoints.Count; ++i)
-            {
-                _motorJoints[i].InitVelocityConstraints(timeStep);
-            }
-            for (int i = 0; i < _gearJoints.Count; ++i)
-            {
-                _gearJoints[i].InitVelocityConstraints(timeStep);
-            }
-            for (int i = 0; i < _ropeJoints.Count; ++i)
-            {
-                _ropeJoints[i].InitVelocityConstraints(timeStep);
-            }
-            for (int i = 0; i < _frictionJoints.Count; ++i)
-            {
-                _frictionJoints[i].InitVelocityConstraints(timeStep);
-            }
-            SolveContacts(timeStep, warmStart: true);
-            for (int i = 0; i < _def.VelocityIterations; ++i)
-            {
-                SolveContacts(timeStep, warmStart: false);
-                for (int j = 0; j < _distanceJoints.Count; ++j)
-                {
-                    _distanceJoints[j].SolveVelocityConstraints();
-                }
-                for (int j = 0; j < _revoluteJoints.Count; ++j)
-                {
-                    _revoluteJoints[j].SolveVelocityConstraints(timeStep);
-                }
-                for (int j = 0; j < _prismaticJoints.Count; ++j)
-                {
-                    _prismaticJoints[j].SolveVelocityConstraints(timeStep);
-                }
-                for (int j = 0; j < _wheelJoints.Count; ++j)
-                {
-                    _wheelJoints[j].SolveVelocityConstraints(timeStep);
-                }
-                for (int j = 0; j < _pulleyJoints.Count; ++j)
-                {
-                    _pulleyJoints[j].SolveVelocityConstraints();
-                }
-                for (int j = 0; j < _weldJoints.Count; ++j)
-                {
-                    _weldJoints[j].SolveVelocityConstraints(timeStep);
-                }
-                for (int j = 0; j < _motorJoints.Count; ++j)
-                {
-                    _motorJoints[j].SolveVelocityConstraints(timeStep);
-                }
-                for (int j = 0; j < _gearJoints.Count; ++j)
-                {
-                    _gearJoints[j].SolveVelocityConstraints(timeStep);
-                }
-                for (int j = 0; j < _ropeJoints.Count; ++j)
-                {
-                    _ropeJoints[j].SolveVelocityConstraints(timeStep);
-                }
-                for (int j = 0; j < _frictionJoints.Count; ++j)
-                {
-                    _frictionJoints[j].SolveVelocityConstraints(timeStep);
-                }
-            }
-
-            RaiseContactImpulseEvents();
-
-            for (int i = 0; i < _bodies.Count; ++i)
-            {
-                Body body = _bodies[i];
-                if (body.Type == BodyType.Static)
-                {
-                    continue;
-                }
-
-                if (_def.EnableSleep && body.Awake == false)
-                {
-                    continue;
-                }
-
-                Vec2 oldCenter = body.GetWorldCenter();
-                float oldAngle = body.Transform.Q.Angle;
-
-                Vec2 translation = timeStep * body.LinearVelocity;
-                float rotation = timeStep * body.AngularVelocity;
-
-                float maxTranslation = _def.MaximumTranslation;
-                float maxRotation = _def.MaximumRotation;
-                bool translationClamped = translation.LengthSquared > maxTranslation * maxTranslation;
-                bool rotationClamped = MathF.Abs(rotation) > maxRotation;
-
-                translation = ClampTranslation(translation, maxTranslation);
-                rotation = ClampRotation(rotation, maxRotation);
-                if (translationClamped && timeStep > 0f)
-                {
-                    body.LinearVelocity = translation / timeStep;
-                }
-                if (rotationClamped && timeStep > 0f)
-                {
-                    body.AngularVelocity = rotation / timeStep;
-                }
-
-                Vec2 newCenter = oldCenter + translation;
-                float newAngle = oldAngle + rotation;
-                Rot newRot = new Rot(newAngle);
-                Vec2 newPosition = newCenter - Rot.Mul(newRot, body.LocalCenter);
-                body.SetTransform(newPosition, newRot);
-
-                body.Sweep = new Sweep(body.LocalCenter, oldCenter, newCenter, oldAngle, newAngle, 0f);
-            }
-
-            for (int i = 0; i < _def.PositionIterations; ++i)
-            {
-                SolvePositionConstraints();
-                for (int j = 0; j < _distanceJoints.Count; ++j)
-                {
-                    _distanceJoints[j].SolvePositionConstraints();
-                }
-                for (int j = 0; j < _revoluteJoints.Count; ++j)
-                {
-                    _revoluteJoints[j].SolvePositionConstraints();
-                }
-                for (int j = 0; j < _prismaticJoints.Count; ++j)
-                {
-                    _prismaticJoints[j].SolvePositionConstraints();
-                }
-                for (int j = 0; j < _wheelJoints.Count; ++j)
-                {
-                    _wheelJoints[j].SolvePositionConstraints();
-                }
-                for (int j = 0; j < _pulleyJoints.Count; ++j)
-                {
-                    _pulleyJoints[j].SolvePositionConstraints();
-                }
-                for (int j = 0; j < _weldJoints.Count; ++j)
-                {
-                    _weldJoints[j].SolvePositionConstraints();
-                }
-                for (int j = 0; j < _motorJoints.Count; ++j)
-                {
-                    _motorJoints[j].SolvePositionConstraints();
-                }
-                for (int j = 0; j < _gearJoints.Count; ++j)
-                {
-                    _gearJoints[j].SolvePositionConstraints();
-                }
-                for (int j = 0; j < _ropeJoints.Count; ++j)
-                {
-                    _ropeJoints[j].SolvePositionConstraints();
-                }
-                for (int j = 0; j < _frictionJoints.Count; ++j)
-                {
-                    _frictionJoints[j].SolvePositionConstraints();
-                }
-            }
-            if (_def.EnableSleep)
-            {
-                UpdateSleep(timeStep);
-            }
-            SolveTOI();
+            _solverPipeline.Step(timeStep);
         }
 
         private void RaiseContactImpulseEvents()
         {
-            if (_contacts.Count == 0)
+            if (_awakeSet.Contacts.Count == 0)
             {
                 return;
             }
 
             System.Collections.Generic.List<ContactImpulseEvent> impulseEvents = new System.Collections.Generic.List<ContactImpulseEvent>();
-            for (int i = 0; i < _contacts.Count; ++i)
+            for (int i = 0; i < _awakeSet.Contacts.Count; ++i)
             {
-                Contact contact = _contacts[i];
+                Contact contact = _awakeSet.Contacts[i];
                 if (contact.FixtureA == null || contact.FixtureB == null)
                 {
                     continue;
@@ -731,9 +1157,14 @@ namespace Box2DNG
 
         private void SolveContacts(float timeStep, bool warmStart)
         {
-            for (int i = 0; i < _contacts.Count; ++i)
+            SolveContacts(timeStep, warmStart, _contacts);
+        }
+
+        private void SolveContacts(float timeStep, bool warmStart, System.Collections.Generic.IReadOnlyList<Contact> contacts)
+        {
+            for (int i = 0; i < contacts.Count; ++i)
             {
-                Contact contact = _contacts[i];
+                Contact contact = contacts[i];
                 if (contact.FixtureA == null || contact.FixtureB == null)
                 {
                     continue;
@@ -1521,9 +1952,14 @@ namespace Box2DNG
 
         private void SolvePositionConstraints()
         {
-            for (int i = 0; i < _contacts.Count; ++i)
+            SolvePositionConstraints(_contacts);
+        }
+
+        private void SolvePositionConstraints(System.Collections.Generic.IReadOnlyList<Contact> contacts)
+        {
+            for (int i = 0; i < contacts.Count; ++i)
             {
-                Contact contact = _contacts[i];
+                Contact contact = contacts[i];
                 if (contact.FixtureA == null || contact.FixtureB == null)
                 {
                     continue;
@@ -1650,9 +2086,14 @@ namespace Box2DNG
 
         private void PrepareContacts(float timeStep, float dtRatio)
         {
-            for (int i = 0; i < _contacts.Count; ++i)
+            PrepareContacts(timeStep, dtRatio, _contacts);
+        }
+
+        private void PrepareContacts(float timeStep, float dtRatio, System.Collections.Generic.IReadOnlyList<Contact> contacts)
+        {
+            for (int i = 0; i < contacts.Count; ++i)
             {
-                Contact contact = _contacts[i];
+                Contact contact = contacts[i];
                 if (contact.FixtureA == null || contact.FixtureB == null)
                 {
                     continue;
@@ -1742,6 +2183,8 @@ namespace Box2DNG
                 if (_contactMap.TryGetValue(remove[i], out Contact? contact) && contact.FixtureA != null && contact.FixtureB != null)
                 {
                     endEvents.Add(new ContactEndEvent(contact.FixtureA.UserData, contact.FixtureB.UserData));
+                    _awakeSet.Contacts.Remove(contact);
+                    _sleepingSet.Contacts.Remove(contact);
                 }
                 _contactMap.Remove(remove[i]);
             }
@@ -1901,40 +2344,61 @@ namespace Box2DNG
 
         private void UpdateSleep(float timeStep)
         {
-            float minSleepTime = float.MaxValue;
-
-            for (int i = 0; i < _bodies.Count; ++i)
+            if (_awakeSet.Islands.Count == 0)
             {
-                Body body = _bodies[i];
-                if (body.Type == BodyType.Static || body.AllowSleep == false)
-                {
-                    body.SleepTime = 0f;
-                    continue;
-                }
-
-                if (body.LinearVelocity.LengthSquared > Constants.LinearSleepTolerance * Constants.LinearSleepTolerance ||
-                    MathF.Abs(body.AngularVelocity) > Constants.AngularSleepTolerance)
-                {
-                    body.SleepTime = 0f;
-                    minSleepTime = 0f;
-                }
-                else
-                {
-                    body.SleepTime += timeStep;
-                    minSleepTime = MathF.Min(minSleepTime, body.SleepTime);
-                }
+                return;
             }
 
-            if (minSleepTime >= Constants.TimeToSleep)
+            float linearTolSqr = Constants.LinearSleepTolerance * Constants.LinearSleepTolerance;
+            float angularTol = Constants.AngularSleepTolerance;
+
+            for (int i = 0; i < _awakeSet.Islands.Count; ++i)
             {
-                for (int i = 0; i < _bodies.Count; ++i)
+                Island island = _awakeSet.Islands[i];
+                float minSleepTime = float.MaxValue;
+
+                for (int j = 0; j < island.Bodies.Count; ++j)
                 {
-                    Body body = _bodies[i];
-                    if (body.Type == BodyType.Static || body.AllowSleep == false)
+                    Body body = island.Bodies[j];
+                    if (body.Type == BodyType.Static)
                     {
                         continue;
                     }
-                    body.SetAwake(false);
+
+                    if (body.AllowSleep == false ||
+                        body.LinearVelocity.LengthSquared > linearTolSqr ||
+                        MathF.Abs(body.AngularVelocity) > angularTol)
+                    {
+                        body.SleepTime = 0f;
+                        minSleepTime = 0f;
+                    }
+                    else
+                    {
+                        body.SleepTime += timeStep;
+                        minSleepTime = MathF.Min(minSleepTime, body.SleepTime);
+                    }
+                }
+
+                if (minSleepTime >= Constants.TimeToSleep)
+                {
+                    island.IsAwake = false;
+                    MoveIslandBetweenSets(island, _awakeSet, _sleepingSet);
+                    i--;
+
+                    for (int j = 0; j < island.Bodies.Count; ++j)
+                    {
+                        Body body = island.Bodies[j];
+                        if (body.Type == BodyType.Static || body.AllowSleep == false || body.Awake == false)
+                        {
+                            continue;
+                        }
+                        body.SetAwakeFromWorld(false, notifyWorld: false);
+                        _awakeSet.Bodies.Remove(body);
+                        if (!_sleepingSet.Bodies.Contains(body))
+                        {
+                            _sleepingSet.Bodies.Add(body);
+                        }
+                    }
                 }
             }
         }
