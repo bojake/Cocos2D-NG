@@ -9,4 +9,12 @@ namespace Box2DNG
         public readonly List<Contact> Contacts = new List<Contact>();
         public readonly List<JointHandle> Joints = new List<JointHandle>();
     }
+
+    internal enum SolverSetType
+    {
+        Static,
+        Disabled,
+        Awake,
+        Sleeping
+    }
 }

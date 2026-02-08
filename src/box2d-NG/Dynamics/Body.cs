@@ -29,6 +29,7 @@ namespace Box2DNG
         public bool Awake { get; private set; }
         public bool AllowSleep { get; private set; }
         public float SleepTime { get; internal set; }
+        internal SolverSetType SolverSetType { get; set; } = SolverSetType.Awake;
 
         internal Body(World world, BodyDef def)
         {
@@ -45,6 +46,7 @@ namespace Box2DNG
             MotionLocks = def.MotionLocks;
             Awake = def.Awake;
             AllowSleep = def.AllowSleep;
+            SolverSetType = Type == BodyType.Static ? SolverSetType.Static : (def.Awake ? SolverSetType.Awake : SolverSetType.Sleeping);
 
             ResetMassData();
             LocalCenter = Vec2.Zero;

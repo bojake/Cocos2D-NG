@@ -5,6 +5,7 @@ namespace Box2DNG
         private sealed class SolverPipeline
         {
             private readonly World _world;
+            private readonly System.Collections.Generic.List<Contact> _awakeContactsScratch = new System.Collections.Generic.List<Contact>();
 
             public SolverPipeline(World world)
             {
@@ -30,8 +31,7 @@ namespace Box2DNG
                 }
 
                 IntegrateVelocities(timeStep);
-                InitializeConstraints(timeStep, dtRatio);
-                SolveVelocityConstraints(timeStep);
+                SolveVelocityConstraints(timeStep, dtRatio);
                 _world.RaiseContactImpulseEvents();
                 IntegratePositions(timeStep);
                 SolvePositionConstraints(timeStep);
@@ -41,174 +41,217 @@ namespace Box2DNG
 
             private void IntegrateVelocities(float timeStep)
             {
-                System.Collections.Generic.HashSet<Body> activeBodies = new System.Collections.Generic.HashSet<Body>();
                 for (int i = 0; i < _world._awakeSet.Islands.Count; ++i)
                 {
                     Island island = _world._awakeSet.Islands[i];
+                    if (!island.IsAwake)
+                    {
+                        continue;
+                    }
                     for (int j = 0; j < island.Bodies.Count; ++j)
                     {
-                        activeBodies.Add(island.Bodies[j]);
-                    }
-                }
+                        Body body = island.Bodies[j];
+                        if (body.Type == BodyType.Static)
+                        {
+                            continue;
+                        }
 
-                for (int i = 0; i < _world._bodies.Count; ++i)
-                {
-                    Body body = _world._bodies[i];
-                    if (body.Type == BodyType.Static)
-                    {
-                        continue;
-                    }
+                        if (_world._def.EnableSleep && body.AllowSleep == false)
+                        {
+                            body.SetAwake(true);
+                        }
 
-                    if (_world._def.EnableSleep && body.AllowSleep == false)
-                    {
-                        body.SetAwake(true);
-                    }
+                        if (_world._def.EnableSleep && body.Awake == false)
+                        {
+                            continue;
+                        }
 
-                    if (_world._def.EnableSleep && body.Awake == false)
-                    {
-                        continue;
-                    }
+                        if (body.Type == BodyType.Dynamic)
+                        {
+                            Vec2 accel = body.GravityScale * _world.Gravity;
+                            if (body.InverseMass > 0f)
+                            {
+                                accel += body.InverseMass * body.Force;
+                            }
+                            body.LinearVelocity += timeStep * accel;
+                            if (body.InverseInertia > 0f)
+                            {
+                                body.AngularVelocity += timeStep * body.InverseInertia * body.Torque;
+                            }
+                            body.LinearVelocity = ApplyLinearDamping(body.LinearVelocity, body.LinearDamping, timeStep);
+                            body.AngularVelocity = ApplyAngularDamping(body.AngularVelocity, body.AngularDamping, timeStep);
 
-                    if (activeBodies.Count > 0 && activeBodies.Contains(body) == false)
-                    {
+                            if ((body.MotionLocks & MotionLocks.LinearX) != 0)
+                            {
+                                body.LinearVelocity = new Vec2(0f, body.LinearVelocity.Y);
+                            }
+                            if ((body.MotionLocks & MotionLocks.LinearY) != 0)
+                            {
+                                body.LinearVelocity = new Vec2(body.LinearVelocity.X, 0f);
+                            }
+                            if ((body.MotionLocks & MotionLocks.AngularZ) != 0)
+                            {
+                                body.AngularVelocity = 0f;
+                            }
+                        }
+
+                        body.LinearVelocity = ClampLinearSpeed(body.LinearVelocity, _world._def.MaximumLinearSpeed);
+                        body.AngularVelocity = ClampAngularSpeed(body.AngularVelocity, _world._def.MaximumAngularSpeed);
                         body.ClearForces();
+                    }
+                }
+            }
+
+            private void SolveVelocityConstraints(float timeStep, float dtRatio)
+            {
+                World.ContactSolverStats aggregateStats = new World.ContactSolverStats();
+                bool useSimd = _world._def.EnableContactSolverSimd && System.Numerics.Vector.IsHardwareAccelerated;
+
+                for (int islandIndex = 0; islandIndex < _world._awakeSet.Islands.Count; ++islandIndex)
+                {
+                    Island island = _world._awakeSet.Islands[islandIndex];
+
+                    if (!island.IsAwake)
+                    {
                         continue;
                     }
 
-                    if (body.Type == BodyType.Dynamic)
+                    System.Collections.Generic.List<Contact> awakeContacts = FilterAwakeContacts(island.Contacts);
+                    if (useSimd)
                     {
-                        Vec2 accel = body.GravityScale * _world.Gravity;
-                        if (body.InverseMass > 0f)
-                        {
-                            accel += body.InverseMass * body.Force;
-                        }
-                        body.LinearVelocity += timeStep * accel;
-                        if (body.InverseInertia > 0f)
-                        {
-                            body.AngularVelocity += timeStep * body.InverseInertia * body.Torque;
-                        }
-                        body.LinearVelocity = ApplyLinearDamping(body.LinearVelocity, body.LinearDamping, timeStep);
-                        body.AngularVelocity = ApplyAngularDamping(body.AngularVelocity, body.AngularDamping, timeStep);
+                        _world._contactSolverSimd.Prepare(timeStep, dtRatio, awakeContacts);
+                        _world._contactSolverSimd.WarmStart();
+                    }
+                    else
+                    {
+                        _world._contactSolver.Prepare(timeStep, dtRatio, awakeContacts);
+                        _world._contactSolver.WarmStart();
+                    }
 
-                        if ((body.MotionLocks & MotionLocks.LinearX) != 0)
+                    for (int i = 0; i < island.Joints.Count; ++i)
+                    {
+                        JointHandle handle = island.Joints[i];
+                        if (_world.TryGetJointSolverSetType(handle, out SolverSetType setType) && setType != SolverSetType.Awake)
                         {
-                            body.LinearVelocity = new Vec2(0f, body.LinearVelocity.Y);
+                            continue;
                         }
-                        if ((body.MotionLocks & MotionLocks.LinearY) != 0)
+                        InitJointVelocityConstraints(handle, timeStep);
+                    }
+                    for (int iter = 0; iter < _world._def.VelocityIterations; ++iter)
+                    {
+                        if (useSimd)
                         {
-                            body.LinearVelocity = new Vec2(body.LinearVelocity.X, 0f);
+                            _world._contactSolverSimd.SolveVelocity(useBias: true);
                         }
-                        if ((body.MotionLocks & MotionLocks.AngularZ) != 0)
+                        else
                         {
-                            body.AngularVelocity = 0f;
+                            _world._contactSolver.SolveVelocity(useBias: true);
+                        }
+
+                        for (int i = 0; i < island.Joints.Count; ++i)
+                        {
+                            JointHandle handle = island.Joints[i];
+                            if (_world.TryGetJointSolverSetType(handle, out SolverSetType setType) && setType != SolverSetType.Awake)
+                            {
+                                continue;
+                            }
+                            SolveJointVelocityConstraints(handle, timeStep);
                         }
                     }
 
-                    body.LinearVelocity = ClampLinearSpeed(body.LinearVelocity, _world._def.MaximumLinearSpeed);
-                    body.AngularVelocity = ClampAngularSpeed(body.AngularVelocity, _world._def.MaximumAngularSpeed);
-                    body.ClearForces();
-                }
-            }
-
-            private void InitializeConstraints(float timeStep, float dtRatio)
-            {
-                _world._contactSolver.Prepare(timeStep, dtRatio, _world._awakeSet.Contacts);
-                _world._contactSolver.WarmStart();
-
-                for (int i = 0; i < _world._awakeSet.Joints.Count; ++i)
-                {
-                    JointHandle handle = _world._awakeSet.Joints[i];
-                    InitJointVelocityConstraints(handle, timeStep);
-                }
-            }
-
-            private void SolveVelocityConstraints(float timeStep)
-            {
-                for (int iter = 0; iter < _world._def.VelocityIterations; ++iter)
-                {
-                    _world._contactSolver.SolveVelocity(useBias: true);
-                    for (int i = 0; i < _world._awakeSet.Joints.Count; ++i)
+                    if (useSimd)
                     {
-                        JointHandle handle = _world._awakeSet.Joints[i];
-                        SolveJointVelocityConstraints(handle, timeStep);
+                        _world._contactSolverSimd.ApplyRestitution(_world._def.RestitutionThreshold);
+                        _world._contactSolverSimd.StoreImpulses();
+                        aggregateStats = SumStats(aggregateStats, _world._contactSolverSimd.GetStats());
+                    }
+                    else
+                    {
+                        _world._contactSolver.ApplyRestitution(_world._def.RestitutionThreshold);
+                        _world._contactSolver.StoreImpulses();
                     }
                 }
 
-                _world._contactSolver.ApplyRestitution(_world._def.RestitutionThreshold);
-                _world._contactSolver.StoreImpulses();
+                _world._lastContactSolverStats = useSimd ? aggregateStats : new World.ContactSolverStats();
             }
 
             private void IntegratePositions(float timeStep)
             {
-                System.Collections.Generic.HashSet<Body> activeBodies = new System.Collections.Generic.HashSet<Body>();
                 for (int i = 0; i < _world._awakeSet.Islands.Count; ++i)
                 {
                     Island island = _world._awakeSet.Islands[i];
+                    if (!island.IsAwake)
+                    {
+                        continue;
+                    }
                     for (int j = 0; j < island.Bodies.Count; ++j)
                     {
-                        activeBodies.Add(island.Bodies[j]);
+                        Body body = island.Bodies[j];
+                        if (body.Type == BodyType.Static)
+                        {
+                            continue;
+                        }
+
+                        if (_world._def.EnableSleep && body.Awake == false)
+                        {
+                            continue;
+                        }
+
+                        Vec2 oldCenter = body.GetWorldCenter();
+                        float oldAngle = body.Transform.Q.Angle;
+
+                        Vec2 translation = timeStep * body.LinearVelocity;
+                        float rotation = timeStep * body.AngularVelocity;
+
+                        float maxTranslation = _world._def.MaximumTranslation;
+                        float maxRotation = _world._def.MaximumRotation;
+                        bool translationClamped = translation.LengthSquared > maxTranslation * maxTranslation;
+                        bool rotationClamped = MathF.Abs(rotation) > maxRotation;
+
+                        translation = ClampTranslation(translation, maxTranslation);
+                        rotation = ClampRotation(rotation, maxRotation);
+                        if (translationClamped && timeStep > 0f)
+                        {
+                            body.LinearVelocity = translation / timeStep;
+                        }
+                        if (rotationClamped && timeStep > 0f)
+                        {
+                            body.AngularVelocity = rotation / timeStep;
+                        }
+
+                        Vec2 newCenter = oldCenter + translation;
+                        float newAngle = oldAngle + rotation;
+                        Rot newRot = new Rot(newAngle);
+                        Vec2 newPosition = newCenter - Rot.Mul(newRot, body.LocalCenter);
+                        body.SetTransform(newPosition, newRot);
+
+                        body.Sweep = new Sweep(body.LocalCenter, oldCenter, newCenter, oldAngle, newAngle, 0f);
                     }
-                }
-
-                for (int i = 0; i < _world._bodies.Count; ++i)
-                {
-                    Body body = _world._bodies[i];
-                    if (body.Type == BodyType.Static)
-                    {
-                        continue;
-                    }
-
-                    if (_world._def.EnableSleep && body.Awake == false)
-                    {
-                        continue;
-                    }
-
-                    if (activeBodies.Count > 0 && activeBodies.Contains(body) == false)
-                    {
-                        continue;
-                    }
-
-                    Vec2 oldCenter = body.GetWorldCenter();
-                    float oldAngle = body.Transform.Q.Angle;
-
-                    Vec2 translation = timeStep * body.LinearVelocity;
-                    float rotation = timeStep * body.AngularVelocity;
-
-                    float maxTranslation = _world._def.MaximumTranslation;
-                    float maxRotation = _world._def.MaximumRotation;
-                    bool translationClamped = translation.LengthSquared > maxTranslation * maxTranslation;
-                    bool rotationClamped = MathF.Abs(rotation) > maxRotation;
-
-                    translation = ClampTranslation(translation, maxTranslation);
-                    rotation = ClampRotation(rotation, maxRotation);
-                    if (translationClamped && timeStep > 0f)
-                    {
-                        body.LinearVelocity = translation / timeStep;
-                    }
-                    if (rotationClamped && timeStep > 0f)
-                    {
-                        body.AngularVelocity = rotation / timeStep;
-                    }
-
-                    Vec2 newCenter = oldCenter + translation;
-                    float newAngle = oldAngle + rotation;
-                    Rot newRot = new Rot(newAngle);
-                    Vec2 newPosition = newCenter - Rot.Mul(newRot, body.LocalCenter);
-                    body.SetTransform(newPosition, newRot);
-
-                    body.Sweep = new Sweep(body.LocalCenter, oldCenter, newCenter, oldAngle, newAngle, 0f);
                 }
             }
 
             private void SolvePositionConstraints(float timeStep)
             {
-                for (int iter = 0; iter < _world._def.PositionIterations; ++iter)
+                for (int islandIndex = 0; islandIndex < _world._awakeSet.Islands.Count; ++islandIndex)
                 {
-                    _world.SolvePositionConstraints(_world._awakeSet.Contacts);
-                    for (int i = 0; i < _world._awakeSet.Joints.Count; ++i)
+                    Island island = _world._awakeSet.Islands[islandIndex];
+                    if (!island.IsAwake)
                     {
-                        JointHandle handle = _world._awakeSet.Joints[i];
-                        SolveJointPositionConstraints(handle);
+                        continue;
+                    }
+                    System.Collections.Generic.List<Contact> awakeContacts = FilterAwakeContacts(island.Contacts);
+                    for (int iter = 0; iter < _world._def.PositionIterations; ++iter)
+                    {
+                        _world.SolvePositionConstraints(awakeContacts);
+                        for (int i = 0; i < island.Joints.Count; ++i)
+                        {
+                            JointHandle handle = island.Joints[i];
+                            if (_world.TryGetJointSolverSetType(handle, out SolverSetType setType) && setType != SolverSetType.Awake)
+                            {
+                                continue;
+                            }
+                            SolveJointPositionConstraints(handle);
+                        }
                     }
                 }
             }
@@ -220,6 +263,31 @@ namespace Box2DNG
                     _world.UpdateSleep(timeStep);
                 }
                 _world.SolveTOI();
+            }
+
+            private static World.ContactSolverStats SumStats(World.ContactSolverStats a, World.ContactSolverStats b)
+            {
+                return new World.ContactSolverStats(
+                    a.SinglePointConstraints + b.SinglePointConstraints,
+                    a.TwoPointConstraints + b.TwoPointConstraints,
+                    a.ScalarConstraints + b.ScalarConstraints,
+                    a.Colors + b.Colors,
+                    a.SimdBatches + b.SimdBatches,
+                    a.SimdLanes + b.SimdLanes);
+            }
+
+            private System.Collections.Generic.List<Contact> FilterAwakeContacts(System.Collections.Generic.IReadOnlyList<Contact> contacts)
+            {
+                _awakeContactsScratch.Clear();
+                for (int i = 0; i < contacts.Count; ++i)
+                {
+                    Contact contact = contacts[i];
+                    if (contact.SolverSetType == SolverSetType.Awake)
+                    {
+                        _awakeContactsScratch.Add(contact);
+                    }
+                }
+                return _awakeContactsScratch;
             }
 
             private void InitJointVelocityConstraints(JointHandle handle, float timeStep)
