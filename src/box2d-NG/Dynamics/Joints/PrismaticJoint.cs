@@ -282,21 +282,30 @@ namespace Box2DNG
                 {
                     speculativeDistance = 0f;
                 }
+                float invDt = dt > 0f ? 1f / dt : 0f;
 
                 {
                     float C = translation - LowerTranslation;
                     if (C < speculativeDistance)
                     {
                         float bias1 = 0f;
+                        float massScale = 1f;
+                        float impulseScale = 0f;
                         if (C > 0f)
                         {
                             float safe = 1f;
-                            bias1 = MathF.Min(C, safe) / dt;
+                            bias1 = MathF.Min(C, safe) * invDt;
+                        }
+                        else
+                        {
+                            bias1 = _constraintSoftness.BiasRate * C;
+                            massScale = _constraintSoftness.MassScale;
+                            impulseScale = _constraintSoftness.ImpulseScale;
                         }
 
                         float Cdot = Vec2.Dot(_axis, vB - vA) + _a2 * wB - _a1 * wA;
                         float oldImpulse = _lowerImpulse;
-                        float deltaImpulse = -_axialMass * (Cdot + bias1);
+                        float deltaImpulse = -_axialMass * massScale * (Cdot + bias1) - impulseScale * oldImpulse;
                         _lowerImpulse = MathF.Max(oldImpulse + deltaImpulse, 0f);
                         deltaImpulse = _lowerImpulse - oldImpulse;
 
@@ -319,15 +328,23 @@ namespace Box2DNG
                     if (C < speculativeDistance)
                     {
                         float bias2 = 0f;
+                        float massScale = 1f;
+                        float impulseScale = 0f;
                         if (C > 0f)
                         {
                             float safe = 1f;
-                            bias2 = MathF.Min(C, safe) / dt;
+                            bias2 = MathF.Min(C, safe) * invDt;
+                        }
+                        else
+                        {
+                            bias2 = _constraintSoftness.BiasRate * C;
+                            massScale = _constraintSoftness.MassScale;
+                            impulseScale = _constraintSoftness.ImpulseScale;
                         }
 
                         float Cdot = Vec2.Dot(_axis, vA - vB) + _a1 * wA - _a2 * wB;
                         float oldImpulse = _upperImpulse;
-                        float deltaImpulse = -_axialMass * (Cdot + bias2);
+                        float deltaImpulse = -_axialMass * massScale * (Cdot + bias2) - impulseScale * oldImpulse;
                         _upperImpulse = MathF.Max(oldImpulse + deltaImpulse, 0f);
                         deltaImpulse = _upperImpulse - oldImpulse;
 
