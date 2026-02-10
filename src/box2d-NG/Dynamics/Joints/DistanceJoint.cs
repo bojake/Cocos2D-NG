@@ -63,6 +63,15 @@ namespace Box2DNG
                 _gamma = 0f;
                 _bias = 0f;
             }
+
+            if (_impulse != 0f)
+            {
+                Vec2 P = _impulse * _u;
+                BodyA.LinearVelocity -= BodyA.InverseMass * P;
+                BodyA.AngularVelocity -= BodyA.InverseInertia * Vec2.Cross(rA, P);
+                BodyB.LinearVelocity += BodyB.InverseMass * P;
+                BodyB.AngularVelocity += BodyB.InverseInertia * Vec2.Cross(rB, P);
+            }
         }
 
         internal void SolveVelocityConstraints()

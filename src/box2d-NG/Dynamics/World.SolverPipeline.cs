@@ -37,7 +37,6 @@ namespace Box2DNG
                 {
                     _world.BuildIslands(awakeOnly: _world._def.EnableSleep);
                 }
-
                 IntegrateVelocities(timeStep);
                 SolveVelocityConstraints(timeStep, dtRatio);
                 _world.RaiseContactImpulseEvents();
@@ -45,6 +44,7 @@ namespace Box2DNG
                 SolvePositionConstraints(timeStep);
                 _world.SyncSweeps();
                 FinalizeStep(timeStep);
+                _world.SplitAwakeIslandsIfNeeded();
             }
 
             private void IntegrateVelocities(float timeStep)

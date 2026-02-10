@@ -25,6 +25,7 @@ namespace Box2DNG.Viewer.Samples
             new EdgeShapesSample(),
             new PrismaticSample(),
             new PulleysSample(),
+            new TumblerSample(),
             new RevoluteSample(),
             new GearsSample(),
             new RopeSample(),

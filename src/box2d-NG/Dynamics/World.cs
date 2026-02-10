@@ -427,7 +427,6 @@ namespace Box2DNG
                 islands = BuildDirtyIslands(adjacency, awakeOnly);
             }
 
-            islands = SplitAwakeIslands(adjacency, islands);
             AssignIslandIds(islands, adjacency.BodyIndex);
             UpdateIslandAwakeFlags(islands);
             NormalizeAwakeIslands(islands);
@@ -731,6 +730,40 @@ namespace Box2DNG
                 }
             }
             return best;
+        }
+
+        private bool HasPendingSplit(System.Collections.Generic.List<Island> islands)
+        {
+            for (int i = 0; i < islands.Count; ++i)
+            {
+                Island island = islands[i];
+                if (island.IsAwake && island.ConstraintRemoveCount > 0 && island.Bodies.Count > 1)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void SplitAwakeIslandsIfNeeded()
+        {
+            if (_lastIslands.Count == 0 || !HasPendingSplit(_lastIslands))
+            {
+                return;
+            }
+
+            IslandAdjacency adjacency = BuildIslandAdjacency();
+            System.Collections.Generic.List<Island> islands = SplitAwakeIslands(adjacency, _lastIslands);
+
+            AssignIslandIds(islands, adjacency.BodyIndex);
+            UpdateIslandAwakeFlags(islands);
+            NormalizeAwakeIslands(islands);
+            RebuildSolverSets(islands);
+            SortSolverSets();
+            _lastIslands = islands;
+            RebuildIslandIds();
+            _dirtyIslandIds.Clear();
+            _islandsDirty = false;
         }
 
         private System.Collections.Generic.List<Island> SplitAwakeIslands(IslandAdjacency adjacency, System.Collections.Generic.List<Island> islands)
