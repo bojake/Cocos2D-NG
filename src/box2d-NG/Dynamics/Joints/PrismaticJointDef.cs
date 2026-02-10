@@ -21,6 +21,8 @@ namespace Box2DNG
         public float MotorSpeed { get; private set; }
         public float MaxMotorForce { get; private set; }
         public bool CollideConnected { get; private set; }
+        public float ConstraintHertz { get; private set; }
+        public float ConstraintDampingRatio { get; private set; }
 
         public PrismaticJointDef(Body bodyA, Body bodyB, Vec2 worldAnchor, Vec2 worldAxis)
         {
@@ -61,6 +63,13 @@ namespace Box2DNG
             EnableMotor = true;
             MotorSpeed = speed;
             MaxMotorForce = MathF.Max(0f, maxForce);
+            return this;
+        }
+
+        public PrismaticJointDef WithConstraintTuning(float hertz, float dampingRatio)
+        {
+            ConstraintHertz = MathF.Max(0f, hertz);
+            ConstraintDampingRatio = MathF.Max(0f, dampingRatio);
             return this;
         }
 

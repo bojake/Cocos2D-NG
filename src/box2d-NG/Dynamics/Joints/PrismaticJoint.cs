@@ -21,6 +21,8 @@ namespace Box2DNG
         public float MotorSpeed { get; private set; }
         public float MaxMotorForce { get; private set; }
         public bool CollideConnected { get; }
+        public float ConstraintHertz { get; private set; }
+        public float ConstraintDampingRatio { get; private set; }
 
         private Mat22 _k;
         private Vec2 _perp;
@@ -36,6 +38,7 @@ namespace Box2DNG
         private float _upperImpulse;
         private float _axialMass;
         private Softness _springSoftness;
+        private Softness _constraintSoftness;
 
         public PrismaticJoint(PrismaticJointDef def)
         {
@@ -56,7 +59,10 @@ namespace Box2DNG
             MotorSpeed = def.MotorSpeed;
             MaxMotorForce = def.MaxMotorForce;
             CollideConnected = def.CollideConnected;
+            ConstraintHertz = def.ConstraintHertz;
+            ConstraintDampingRatio = def.ConstraintDampingRatio;
             _springSoftness = default;
+            _constraintSoftness = default;
         }
 
         public void SetSpringEnabled(bool enable)
@@ -95,6 +101,12 @@ namespace Box2DNG
                 _lowerImpulse = 0f;
                 _upperImpulse = 0f;
             }
+        }
+
+        public void SetConstraintTuning(float hertz, float dampingRatio)
+        {
+            ConstraintHertz = MathF.Max(0f, hertz);
+            ConstraintDampingRatio = MathF.Max(0f, dampingRatio);
         }
 
         public void SetLimits(float lower, float upper)
@@ -182,6 +194,8 @@ namespace Box2DNG
             {
                 _springImpulse = 0f;
             }
+
+            _constraintSoftness = Softness.Make(ConstraintHertz, ConstraintDampingRatio, dt);
 
             float axialImpulse = _springImpulse + _motorImpulse + _lowerImpulse - _upperImpulse;
             if (_impulse.X != 0f || _impulse.Y != 0f || axialImpulse != 0f)
@@ -273,16 +287,16 @@ namespace Box2DNG
                     float C = translation - LowerTranslation;
                     if (C < speculativeDistance)
                     {
-                        float bias = 0f;
+                        float bias1 = 0f;
                         if (C > 0f)
                         {
                             float safe = 1f;
-                            bias = MathF.Min(C, safe) / dt;
+                            bias1 = MathF.Min(C, safe) / dt;
                         }
 
                         float Cdot = Vec2.Dot(_axis, vB - vA) + _a2 * wB - _a1 * wA;
                         float oldImpulse = _lowerImpulse;
-                        float deltaImpulse = -_axialMass * (Cdot + bias);
+                        float deltaImpulse = -_axialMass * (Cdot + bias1);
                         _lowerImpulse = MathF.Max(oldImpulse + deltaImpulse, 0f);
                         deltaImpulse = _lowerImpulse - oldImpulse;
 
@@ -304,16 +318,16 @@ namespace Box2DNG
                     float C = UpperTranslation - translation;
                     if (C < speculativeDistance)
                     {
-                        float bias = 0f;
+                        float bias2 = 0f;
                         if (C > 0f)
                         {
                             float safe = 1f;
-                            bias = MathF.Min(C, safe) / dt;
+                            bias2 = MathF.Min(C, safe) / dt;
                         }
 
                         float Cdot = Vec2.Dot(_axis, vA - vB) + _a1 * wA - _a2 * wB;
                         float oldImpulse = _upperImpulse;
-                        float deltaImpulse = -_axialMass * (Cdot + bias);
+                        float deltaImpulse = -_axialMass * (Cdot + bias2);
                         _upperImpulse = MathF.Max(oldImpulse + deltaImpulse, 0f);
                         deltaImpulse = _upperImpulse - oldImpulse;
 
@@ -336,7 +350,16 @@ namespace Box2DNG
                 Vec2.Dot(_perp, vB - vA) + _s2 * wB - _s1 * wA,
                 wB - wA);
 
-            Vec2 df = Solve22(_k, -Cdot1);
+            Vec2 C1 = new Vec2(
+                Vec2.Dot(_perp, d),
+                (BodyB.Transform.Q.Angle - BodyA.Transform.Q.Angle) - ReferenceAngle);
+
+            Vec2 bias = new Vec2(_constraintSoftness.BiasRate * C1.X, _constraintSoftness.BiasRate * C1.Y);
+            Vec2 rhs = Cdot1 + bias;
+            Vec2 impulseDelta = Solve22(_k, rhs);
+            Vec2 df = new Vec2(
+                -_constraintSoftness.MassScale * impulseDelta.X - _constraintSoftness.ImpulseScale * _impulse.X,
+                -_constraintSoftness.MassScale * impulseDelta.Y - _constraintSoftness.ImpulseScale * _impulse.Y);
             _impulse += df;
 
             Vec2 Pperp = df.X * _perp;
