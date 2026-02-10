@@ -10,7 +10,7 @@ namespace Box2DNG
         private readonly System.Collections.Generic.List<Body> _bodies = new System.Collections.Generic.List<Body>();
         private readonly System.Collections.Generic.List<Contact> _contacts = new System.Collections.Generic.List<Contact>();
         private readonly System.Collections.Generic.Dictionary<ContactKey, Contact> _contactMap = new System.Collections.Generic.Dictionary<ContactKey, Contact>();
-        private readonly System.Collections.Generic.HashSet<ContactKey> _sensorPairs = new System.Collections.Generic.HashSet<ContactKey>();
+        private readonly HashSet64 _sensorPairs = new HashSet64(32);
         private readonly System.Collections.Generic.Dictionary<ContactKey, (object? A, object? B)> _sensorUserData = new System.Collections.Generic.Dictionary<ContactKey, (object? A, object? B)>();
         private readonly System.Collections.Generic.Dictionary<int, System.Collections.Generic.HashSet<int>> _sensorOverlaps =
             new System.Collections.Generic.Dictionary<int, System.Collections.Generic.HashSet<int>>();
@@ -2076,18 +2076,25 @@ namespace Box2DNG
 
             if (fixture.ProxyId >= 0 && _sensorPairs.Count > 0)
             {
-                System.Collections.Generic.List<ContactKey> sensorRemove = new System.Collections.Generic.List<ContactKey>();
-                foreach (var key in _sensorPairs)
+                System.Collections.Generic.List<ulong> sensorKeys = new System.Collections.Generic.List<ulong>();
+                _sensorPairs.CopyKeys(sensorKeys);
+                System.Collections.Generic.List<ulong> sensorRemove = new System.Collections.Generic.List<ulong>();
+                for (int i = 0; i < sensorKeys.Count; ++i)
                 {
-                    if (key.A == fixture.ProxyId || key.B == fixture.ProxyId)
+                    ulong key = sensorKeys[i];
+                    int a = UnpackProxyIdA(key);
+                    int b = UnpackProxyIdB(key);
+                    if (a == fixture.ProxyId || b == fixture.ProxyId)
                     {
                         sensorRemove.Add(key);
                     }
                 }
                 for (int i = 0; i < sensorRemove.Count; ++i)
                 {
-                    _sensorPairs.Remove(sensorRemove[i]);
-                    _sensorUserData.Remove(sensorRemove[i]);
+                    ulong key = sensorRemove[i];
+                    _sensorPairs.Remove(key);
+                    ContactKey contactKey = new ContactKey(UnpackProxyIdA(key), UnpackProxyIdB(key));
+                    _sensorUserData.Remove(contactKey);
                 }
             }
         }
@@ -2245,7 +2252,7 @@ namespace Box2DNG
             _awakeSet.Contacts.Clear();
             _sleepingSet.Contacts.Clear();
             _disabledSet.Contacts.Clear();
-            System.Collections.Generic.HashSet<ContactKey> seen = new System.Collections.Generic.HashSet<ContactKey>();
+            HashSet64 seen = new HashSet64(128);
             System.Collections.Generic.List<(ContactKey Key, ContactBeginEvent Event)> beginEvents =
                 new System.Collections.Generic.List<(ContactKey, ContactBeginEvent)>();
             System.Collections.Generic.List<(ContactKey Key, ContactEndEvent Event)> endEvents =
@@ -2284,7 +2291,7 @@ namespace Box2DNG
             for (int i = 0; i < pairs.Count; ++i)
             {
                 (ContactKey contactKey, Fixture fixtureA, Fixture fixtureB) = pairs[i];
-                seen.Add(contactKey);
+                seen.Add(MakeProxyPairKey(contactKey.A, contactKey.B));
 
                 if (!_contactMap.TryGetValue(contactKey, out Contact? contact))
                 {
@@ -2672,7 +2679,7 @@ namespace Box2DNG
                     current.Add(otherId);
 
                     ContactKey key = new ContactKey(sensorId, otherId);
-                    _sensorPairs.Add(key);
+                    _sensorPairs.Add(MakeProxyPairKey(sensorId, otherId));
 
                     Fixture? otherFixture = _broadPhase.GetUserData(otherId);
                     _sensorUserData[key] = (sensor.UserData, otherFixture?.UserData);
@@ -3356,9 +3363,9 @@ namespace Box2DNG
                 return;
             }
 
-            System.Collections.Generic.HashSet<ContactKey> processed = new System.Collections.Generic.HashSet<ContactKey>();
+            HashSet64 processed = new HashSet64(256);
             System.Collections.Generic.List<SensorHitEvent> sensorHitEvents = new System.Collections.Generic.List<SensorHitEvent>();
-            System.Collections.Generic.HashSet<ContactKey> sensorHitKeys = new System.Collections.Generic.HashSet<ContactKey>();
+            HashSet64 sensorHitKeys = new HashSet64(128);
 
             System.Collections.Generic.List<Contact> orderedContacts = new System.Collections.Generic.List<Contact>(_contactMap.Count);
             foreach (Contact contact in _contactMap.Values)
@@ -3375,7 +3382,7 @@ namespace Box2DNG
                     continue;
                 }
 
-                processed.Add(new ContactKey(contact.FixtureA.ProxyId, contact.FixtureB.ProxyId));
+                processed.Add(MakeProxyPairKey(contact.FixtureA.ProxyId, contact.FixtureB.ProxyId));
                 ProcessTOI(contact, timeStep, subSteps);
             }
 
@@ -3445,8 +3452,8 @@ namespace Box2DNG
                                 return 1f;
                             }
 
-                            ContactKey hitKey = new ContactKey(otherFixture.ProxyId, fixture.ProxyId);
-                            if (sensorHitKeys.Add(hitKey))
+                            ulong hitKey = MakeProxyPairKey(otherFixture.ProxyId, fixture.ProxyId);
+                            if (!sensorHitKeys.Add(hitKey))
                             {
                                 sensorHitEvents.Add(new SensorHitEvent(
                                     otherFixture.UserData,
@@ -3472,7 +3479,7 @@ namespace Box2DNG
                             }
                         }
 
-                        ContactKey key = new ContactKey(fixture.ProxyId, otherFixture.ProxyId);
+                        ulong key = MakeProxyPairKey(fixture.ProxyId, otherFixture.ProxyId);
                         if (processed.Contains(key))
                         {
                             return 1f;
@@ -4416,7 +4423,7 @@ namespace Box2DNG
             }
         }
 
-        private void RemoveStaleContacts(System.Collections.Generic.HashSet<ContactKey> live, System.Collections.Generic.List<(ContactKey Key, ContactEndEvent Event)> endEvents)
+        private void RemoveStaleContacts(HashSet64 live, System.Collections.Generic.List<(ContactKey Key, ContactEndEvent Event)> endEvents)
         {
             if (_contactMap.Count == 0)
             {
@@ -4426,7 +4433,7 @@ namespace Box2DNG
             System.Collections.Generic.List<ContactKey> remove = new System.Collections.Generic.List<ContactKey>();
             foreach (var pair in _contactMap)
             {
-                if (!live.Contains(pair.Key))
+                if (!live.Contains(MakeProxyPairKey(pair.Key.A, pair.Key.B)))
                 {
                     remove.Add(pair.Key);
                 }
@@ -4458,35 +4465,36 @@ namespace Box2DNG
             }
         }
 
-        private void RemoveStaleSensors(System.Collections.Generic.HashSet<ContactKey> live, System.Collections.Generic.List<SensorEndEvent> endEvents)
+        private void RemoveStaleSensors(HashSet64 live, System.Collections.Generic.List<SensorEndEvent> endEvents)
         {
             if (_sensorPairs.Count == 0)
             {
-                _sensorPairs.UnionWith(live);
+                MergeSensorPairs(live);
                 return;
             }
 
-            System.Collections.Generic.List<ContactKey> remove = new System.Collections.Generic.List<ContactKey>();
-            foreach (var key in _sensorPairs)
+            System.Collections.Generic.List<ulong> previous = new System.Collections.Generic.List<ulong>();
+            _sensorPairs.CopyKeys(previous);
+            System.Collections.Generic.List<ulong> remove = new System.Collections.Generic.List<ulong>();
+            for (int i = 0; i < previous.Count; ++i)
             {
+                ulong key = previous[i];
                 if (!live.Contains(key))
                 {
                     remove.Add(key);
                 }
             }
-            remove.Sort((a, b) =>
-            {
-                int cmp = a.A.CompareTo(b.A);
-                return cmp != 0 ? cmp : a.B.CompareTo(b.B);
-            });
+            remove.Sort(CompareProxyPairKeys);
 
             for (int i = 0; i < remove.Count; ++i)
             {
-                _sensorPairs.Remove(remove[i]);
-                if (_sensorUserData.TryGetValue(remove[i], out var data))
+                ulong key = remove[i];
+                _sensorPairs.Remove(key);
+                ContactKey contactKey = new ContactKey(UnpackProxyIdA(key), UnpackProxyIdB(key));
+                if (_sensorUserData.TryGetValue(contactKey, out var data))
                 {
                     endEvents.Add(new SensorEndEvent(data.A, data.B));
-                    _sensorUserData.Remove(remove[i]);
+                    _sensorUserData.Remove(contactKey);
                 }
                 else
                 {
@@ -4494,7 +4502,7 @@ namespace Box2DNG
                 }
             }
 
-            _sensorPairs.UnionWith(live);
+            MergeSensorPairs(live);
         }
 
         private static bool TestOverlap(Fixture a, Fixture b)
@@ -4708,6 +4716,46 @@ namespace Box2DNG
                     hash = (hash * 31) + B.GetHashCode();
                     return hash;
                 }
+            }
+        }
+
+        private static ulong MakeProxyPairKey(int proxyIdA, int proxyIdB)
+        {
+            uint a = (uint)(proxyIdA + 1);
+            uint b = (uint)(proxyIdB + 1);
+            return a < b ? ((ulong)a << 32) | b : ((ulong)b << 32) | a;
+        }
+
+        private static int UnpackProxyIdA(ulong key)
+        {
+            return (int)((key >> 32) & 0xFFFFFFFF) - 1;
+        }
+
+        private static int UnpackProxyIdB(ulong key)
+        {
+            return (int)(key & 0xFFFFFFFF) - 1;
+        }
+
+        private static int CompareProxyPairKeys(ulong a, ulong b)
+        {
+            int a0 = UnpackProxyIdA(a);
+            int a1 = UnpackProxyIdB(a);
+            int b0 = UnpackProxyIdA(b);
+            int b1 = UnpackProxyIdB(b);
+            if (a0 != b0)
+            {
+                return a0.CompareTo(b0);
+            }
+            return a1.CompareTo(b1);
+        }
+
+        private void MergeSensorPairs(HashSet64 live)
+        {
+            System.Collections.Generic.List<ulong> keys = new System.Collections.Generic.List<ulong>();
+            live.CopyKeys(keys);
+            for (int i = 0; i < keys.Count; ++i)
+            {
+                _sensorPairs.Add(keys[i]);
             }
         }
     }
