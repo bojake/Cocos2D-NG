@@ -24,6 +24,8 @@ namespace Box2DNG.Viewer.Samples
             new DominosSample(),
             new EdgeShapesSample(),
             new PrismaticSample(),
+            new UnstablePrismaticJointsSample(),
+            new MultiplePrismaticSample(),
             new PulleysSample(),
             new TumblerSample(),
             new RevoluteSample(),
