@@ -2032,6 +2032,7 @@ namespace Box2DNG
                 Restitution = def.Restitution,
                 Density = def.Density,
                 IsSensor = def.IsSensor,
+                EnableSensorEvents = def.EnableSensorEvents,
                 Filter = def.Filter,
                 UserData = def.UserData
             };
@@ -2596,6 +2597,23 @@ namespace Box2DNG
             {
                 Fixture sensor = sensors[i];
                 int sensorId = sensor.ProxyId;
+                if (!sensor.EnableSensorEvents)
+                {
+                    if (_sensorOverlaps.TryGetValue(sensorId, out System.Collections.Generic.HashSet<int>? previousDisabled) &&
+                        previousDisabled.Count > 0)
+                    {
+                        System.Collections.Generic.List<int> oldIds = new System.Collections.Generic.List<int>(previousDisabled);
+                        oldIds.Sort();
+                        for (int j = 0; j < oldIds.Count; ++j)
+                        {
+                            int oldId = oldIds[j];
+                            Fixture? oldFixture = _broadPhase.GetUserData(oldId);
+                            sensorEndEvents.Add(new SensorEndEvent(sensor.UserData, oldFixture?.UserData));
+                        }
+                        previousDisabled.Clear();
+                    }
+                    continue;
+                }
                 activeSensors.Add(sensorId);
 
                 System.Collections.Generic.List<int> overlaps = new System.Collections.Generic.List<int>();
@@ -3339,6 +3357,8 @@ namespace Box2DNG
             }
 
             System.Collections.Generic.HashSet<ContactKey> processed = new System.Collections.Generic.HashSet<ContactKey>();
+            System.Collections.Generic.List<SensorHitEvent> sensorHitEvents = new System.Collections.Generic.List<SensorHitEvent>();
+            System.Collections.Generic.HashSet<ContactKey> sensorHitKeys = new System.Collections.Generic.HashSet<ContactKey>();
 
             System.Collections.Generic.List<Contact> orderedContacts = new System.Collections.Generic.List<Contact>(_contactMap.Count);
             foreach (Contact contact in _contactMap.Values)
@@ -3361,30 +3381,35 @@ namespace Box2DNG
 
             for (int i = 0; i < _bodies.Count; ++i)
             {
-                Body bulletBody = _bodies[i];
-                if (!bulletBody.Definition.Bullet || bulletBody.Type == BodyType.Static)
+                Body movingBody = _bodies[i];
+                if (movingBody.Type == BodyType.Static)
                 {
                     continue;
                 }
 
-                Vec2 translation = bulletBody.Sweep.C - bulletBody.Sweep.C0;
-                float minTranslation = MathF.Max(Constants.LinearSlop, 0.25f * bulletBody.Sweep.LocalCenter.Length);
+                Vec2 translation = movingBody.Sweep.C - movingBody.Sweep.C0;
+                float minTranslation = MathF.Max(Constants.LinearSlop, 0.25f * movingBody.Sweep.LocalCenter.Length);
                 if (translation.LengthSquared <= minTranslation * minTranslation)
                 {
                     continue;
                 }
 
-                for (int f = 0; f < bulletBody.Fixtures.Count; ++f)
+                for (int f = 0; f < movingBody.Fixtures.Count; ++f)
                 {
-                    Fixture fixture = bulletBody.Fixtures[f];
+                    Fixture fixture = movingBody.Fixtures[f];
                     if (fixture.IsSensor)
                     {
                         continue;
                     }
+                    if (!fixture.EnableSensorEvents)
+                    {
+                        continue;
+                    }
 
-                    Transform startTransform = bulletBody.Sweep.GetTransform(0f);
+                    Transform startTransform = movingBody.Sweep.GetTransform(0f);
                     ShapeProxy proxy = BuildWorldProxy(fixture.Shape, startTransform);
                     ShapeCastInput input = new ShapeCastInput(proxy, translation, 1f, false);
+                    float minSolidFraction = 1f;
                     _broadPhase.ShapeCast(otherId =>
                     {
                         Fixture? otherFixture = _broadPhase.GetUserData(otherId);
@@ -3398,14 +3423,53 @@ namespace Box2DNG
                             return 1f;
                         }
 
+                        if (otherFixture.Body == fixture.Body)
+                        {
+                            return 1f;
+                        }
+
                         if (otherFixture.IsSensor)
                         {
+                            if (!ShouldSensorOverlap(otherFixture, fixture))
+                            {
+                                return 1f;
+                            }
+
+                            if (!TryShapeCast(otherFixture, fixture, startTransform, translation, out CastOutput cast))
+                            {
+                                return 1f;
+                            }
+
+                            if (!cast.Hit || cast.Fraction > minSolidFraction)
+                            {
+                                return 1f;
+                            }
+
+                            ContactKey hitKey = new ContactKey(otherFixture.ProxyId, fixture.ProxyId);
+                            if (sensorHitKeys.Add(hitKey))
+                            {
+                                sensorHitEvents.Add(new SensorHitEvent(
+                                    otherFixture.UserData,
+                                    fixture.UserData,
+                                    cast.Point,
+                                    cast.Normal,
+                                    cast.Fraction));
+                            }
                             return 1f;
                         }
 
                         if (!ShouldCollide(fixture, otherFixture))
                         {
                             return 1f;
+                        }
+
+                        if (TryShapeCast(otherFixture, fixture, startTransform, translation, out CastOutput solidCast) &&
+                            solidCast.Hit)
+                        {
+                            if (solidCast.Fraction < minSolidFraction)
+                            {
+                                minSolidFraction = solidCast.Fraction;
+                            }
                         }
 
                         ContactKey key = new ContactKey(fixture.ProxyId, otherFixture.ProxyId);
@@ -3421,6 +3485,11 @@ namespace Box2DNG
                         return 1f;
                     }, input);
                 }
+            }
+
+            if (sensorHitEvents.Count > 0)
+            {
+                _events.Raise(new SensorHitEvents(sensorHitEvents.ToArray()));
             }
         }
 
@@ -3566,6 +3635,22 @@ namespace Box2DNG
                 points[i] = Transform.Mul(transform, localProxy.Points[i]);
             }
             return new ShapeProxy(points, localProxy.Count, localProxy.Radius);
+        }
+
+        private static bool TryShapeCast(Fixture stationary, Fixture moving, Transform movingStart, Vec2 translation, out CastOutput output)
+        {
+            ShapeProxy proxyA = ShapeGeometry.ToProxy(stationary.Shape);
+            ShapeProxy proxyB = ShapeGeometry.ToProxy(moving.Shape);
+            ShapeCastPairInput pairInput = new ShapeCastPairInput(
+                proxyA,
+                proxyB,
+                stationary.Body.Transform,
+                movingStart,
+                translation,
+                1f,
+                false);
+            output = ShapeCast.Cast(pairInput);
+            return true;
         }
 
         private Body? FindBodyForShape(Shape shape)
@@ -4076,6 +4161,11 @@ namespace Box2DNG
 
         private static bool ShouldSensorOverlap(Fixture sensor, Fixture other)
         {
+            if (!sensor.EnableSensorEvents || !other.EnableSensorEvents)
+            {
+                return false;
+            }
+
             if (sensor.Filter.GroupIndex != 0 && sensor.Filter.GroupIndex == other.Filter.GroupIndex)
             {
                 return sensor.Filter.GroupIndex > 0;
