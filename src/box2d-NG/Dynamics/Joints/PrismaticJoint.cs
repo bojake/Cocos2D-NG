@@ -16,6 +16,7 @@ namespace Box2DNG
         public bool EnableMotor { get; }
         public float MotorSpeed { get; }
         public float MaxMotorForce { get; }
+        public bool CollideConnected { get; }
 
         private Mat33 _k;
         private Vec2 _perp;
@@ -51,6 +52,7 @@ namespace Box2DNG
             EnableMotor = def.EnableMotor;
             MotorSpeed = def.MotorSpeed;
             MaxMotorForce = def.MaxMotorForce;
+            CollideConnected = def.CollideConnected;
             _limitState = LimitState.Inactive;
         }
 

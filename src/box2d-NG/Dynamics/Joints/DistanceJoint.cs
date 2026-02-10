@@ -11,6 +11,7 @@ namespace Box2DNG
         public float Length { get; private set; }
         public float FrequencyHz { get; }
         public float DampingRatio { get; }
+        public bool CollideConnected { get; }
 
         private float _impulse;
         private float _mass;
@@ -27,6 +28,7 @@ namespace Box2DNG
             Length = def.Length;
             FrequencyHz = def.FrequencyHz;
             DampingRatio = def.DampingRatio;
+            CollideConnected = def.CollideConnected;
         }
 
         internal void InitVelocityConstraints(float dt)
