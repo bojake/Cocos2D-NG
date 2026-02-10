@@ -196,6 +196,10 @@ namespace Box2DNG
             }
 
             _constraintSoftness = Softness.Make(ConstraintHertz, ConstraintDampingRatio, dt);
+            if (ConstraintHertz <= 0f)
+            {
+                _constraintSoftness = new Softness(0f, 1f, 0f);
+            }
 
             float axialImpulse = _springImpulse + _motorImpulse + _lowerImpulse - _upperImpulse;
             if (_impulse.X != 0f || _impulse.Y != 0f || axialImpulse != 0f)
