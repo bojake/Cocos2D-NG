@@ -12,8 +12,8 @@ namespace Box2DNG
         private readonly System.Collections.Generic.Dictionary<ContactKey, Contact> _contactMap = new System.Collections.Generic.Dictionary<ContactKey, Contact>();
         private readonly HashSet64 _sensorPairs = new HashSet64(32);
         private readonly System.Collections.Generic.Dictionary<ContactKey, (object? A, object? B)> _sensorUserData = new System.Collections.Generic.Dictionary<ContactKey, (object? A, object? B)>();
-        private readonly System.Collections.Generic.Dictionary<int, System.Collections.Generic.HashSet<int>> _sensorOverlaps =
-            new System.Collections.Generic.Dictionary<int, System.Collections.Generic.HashSet<int>>();
+        private readonly System.Collections.Generic.Dictionary<int, System.Collections.Generic.HashSet<Fixture>> _sensorOverlaps =
+            new System.Collections.Generic.Dictionary<int, System.Collections.Generic.HashSet<Fixture>>();
         private readonly System.Collections.Generic.List<DistanceJoint> _distanceJoints = new System.Collections.Generic.List<DistanceJoint>();
         private readonly System.Collections.Generic.List<RevoluteJoint> _revoluteJoints = new System.Collections.Generic.List<RevoluteJoint>();
         private readonly System.Collections.Generic.List<PrismaticJoint> _prismaticJoints = new System.Collections.Generic.List<PrismaticJoint>();
@@ -49,6 +49,11 @@ namespace Box2DNG
         private readonly IdPool _contactIdPool = new IdPool();
         private readonly IdPool _solverSetIdPool = new IdPool();
         private readonly IdPool _contactEdgeIdPool = new IdPool();
+        private readonly ConstraintGraph _constraintGraph = new ConstraintGraph(8);
+        private readonly System.Collections.Generic.Dictionary<JointHandle, int> _jointColorIndices =
+            new System.Collections.Generic.Dictionary<JointHandle, int>();
+        private readonly System.Collections.Generic.Dictionary<JointHandle, int> _jointLocalIndices =
+            new System.Collections.Generic.Dictionary<JointHandle, int>();
 
         public World(WorldDef def)
         {
@@ -1255,6 +1260,136 @@ namespace Box2DNG
             set.Joints.Sort(CompareJointHandles);
         }
 
+        private void BuildConstraintGraph()
+        {
+            uint bodyCapacity = (uint)Math.Max(_bodyIdPool.Capacity, 8);
+            _constraintGraph.Reset(bodyCapacity);
+            _jointColorIndices.Clear();
+            _jointLocalIndices.Clear();
+
+            for (int i = 0; i < _awakeSet.Contacts.Count; ++i)
+            {
+                Contact contact = _awakeSet.Contacts[i];
+                if (contact.Manifold.PointCount == 0)
+                {
+                    contact.ColorIndex = -1;
+                    contact.LocalIndex = -1;
+                    contact.LocalIndex = -1;
+                    continue;
+                }
+
+                AddContactToConstraintGraph(contact);
+            }
+
+            for (int i = 0; i < _awakeSet.Joints.Count; ++i)
+            {
+                AddJointToConstraintGraph(_awakeSet.Joints[i]);
+            }
+        }
+
+        private void AddContactToConstraintGraph(Contact contact)
+        {
+            Fixture? fixtureA = contact.FixtureA;
+            Fixture? fixtureB = contact.FixtureB;
+            if (fixtureA == null || fixtureB == null)
+            {
+                return;
+            }
+
+            Body bodyA = fixtureA.Body;
+            Body bodyB = fixtureB.Body;
+            if (bodyA.Type == BodyType.Static && bodyB.Type == BodyType.Static)
+            {
+                contact.ColorIndex = -1;
+                contact.LocalIndex = -1;
+                contact.LocalIndex = -1;
+                return;
+            }
+
+            int colorIndex = _constraintGraph.AssignContactColor(bodyA, bodyB);
+            ConstraintGraph.GraphColor color = _constraintGraph.Colors[colorIndex];
+            contact.ColorIndex = colorIndex;
+            contact.LocalIndex = color.Contacts.Count;
+            color.Contacts.Add(contact);
+        }
+
+        private void AddJointToConstraintGraph(JointHandle handle)
+        {
+            if (!TryGetJointBodies(handle, out Body bodyA, out Body bodyB))
+            {
+                return;
+            }
+
+            if (bodyA.Type == BodyType.Static && bodyB.Type == BodyType.Static)
+            {
+                _jointColorIndices[handle] = -1;
+                _jointLocalIndices[handle] = -1;
+                return;
+            }
+
+            int colorIndex = _constraintGraph.AssignJointColor(bodyA, bodyB);
+            ConstraintGraph.GraphColor color = _constraintGraph.Colors[colorIndex];
+            _jointColorIndices[handle] = colorIndex;
+            _jointLocalIndices[handle] = color.Joints.Count;
+            color.Joints.Add(handle);
+        }
+
+        private bool TryGetJointBodies(JointHandle handle, out Body bodyA, out Body bodyB)
+        {
+            bodyA = null!;
+            bodyB = null!;
+            if (!TryGetJointIndex(handle, out int index))
+            {
+                return false;
+            }
+
+            switch (handle.Type)
+            {
+                case JointType.Distance:
+                    bodyA = _distanceJoints[index].BodyA;
+                    bodyB = _distanceJoints[index].BodyB;
+                    return true;
+                case JointType.Revolute:
+                    bodyA = _revoluteJoints[index].BodyA;
+                    bodyB = _revoluteJoints[index].BodyB;
+                    return true;
+                case JointType.Prismatic:
+                    bodyA = _prismaticJoints[index].BodyA;
+                    bodyB = _prismaticJoints[index].BodyB;
+                    return true;
+                case JointType.Wheel:
+                    bodyA = _wheelJoints[index].BodyA;
+                    bodyB = _wheelJoints[index].BodyB;
+                    return true;
+                case JointType.Pulley:
+                    bodyA = _pulleyJoints[index].BodyA;
+                    bodyB = _pulleyJoints[index].BodyB;
+                    return true;
+                case JointType.Weld:
+                    bodyA = _weldJoints[index].BodyA;
+                    bodyB = _weldJoints[index].BodyB;
+                    return true;
+                case JointType.Motor:
+                    bodyA = _motorJoints[index].BodyA;
+                    bodyB = _motorJoints[index].BodyB;
+                    return true;
+                case JointType.Gear:
+                    bodyA = _gearJoints[index].BodyA;
+                    bodyB = _gearJoints[index].BodyB;
+                    return true;
+                case JointType.Rope:
+                    bodyA = _ropeJoints[index].BodyA;
+                    bodyB = _ropeJoints[index].BodyB;
+                    return true;
+                case JointType.Friction:
+                    bodyA = _frictionJoints[index].BodyA;
+                    bodyB = _frictionJoints[index].BodyB;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private static int CompareIslands(Island? a, Island? b)
         {
             if (ReferenceEquals(a, b))
@@ -2115,6 +2250,7 @@ namespace Box2DNG
                 contact.SolverSetType = setType;
                 contact.SolverSetId = 0;
                 contact.ColorIndex = -1;
+                contact.LocalIndex = -1;
                 if (setType == SolverSetType.Disabled)
                 {
                     _disabledSet.NonTouchingContacts.Add(contact);
@@ -2671,6 +2807,7 @@ namespace Box2DNG
                         contact.SolverSetType = setType;
                         contact.SolverSetId = setType == SolverSetType.Sleeping && validSleeping ? sleepingSetId : 0;
                         contact.ColorIndex = -1;
+                        contact.LocalIndex = -1;
                         if (setType == SolverSetType.Sleeping)
                         {
                             if (contact.IsTouching)
@@ -2689,6 +2826,7 @@ namespace Box2DNG
                         contact.SolverSetType = SolverSetType.Awake;
                         contact.SolverSetId = 0;
                         contact.ColorIndex = -1;
+                        contact.LocalIndex = -1;
                     }
                     AddHitEvent(contact, contactKey, hitEvents);
                 }
@@ -2708,6 +2846,7 @@ namespace Box2DNG
                     contact.SolverSetType = setType;
                     contact.SolverSetId = 0;
                     contact.ColorIndex = -1;
+                    contact.LocalIndex = -1;
                 }
             }
 
@@ -2740,6 +2879,7 @@ namespace Box2DNG
                         endEvents.Add((key, new ContactEndEvent(fixtureA.UserData, fixtureB.UserData)));
                         UnlinkContact(contact);
                         contact.ColorIndex = -1;
+                        contact.LocalIndex = -1;
                     }
                     MarkIslandDirty(fixtureA.Body);
                     MarkIslandDirty(fixtureB.Body);
@@ -2900,8 +3040,9 @@ namespace Box2DNG
             sensors.Sort((a, b) => a.ProxyId.CompareTo(b.ProxyId));
 
             System.Collections.Generic.HashSet<int> activeSensors = new System.Collections.Generic.HashSet<int>();
-            _sensorPairs.Clear();
-            _sensorUserData.Clear();
+            HashSet64 livePairs = new HashSet64(Math.Max(32, _sensorPairs.Count * 2));
+            System.Collections.Generic.Dictionary<ContactKey, (object? A, object? B)> liveUserData =
+                new System.Collections.Generic.Dictionary<ContactKey, (object? A, object? B)>();
 
             for (int i = 0; i < sensors.Count; ++i)
             {
@@ -2909,16 +3050,14 @@ namespace Box2DNG
                 int sensorId = sensor.ProxyId;
                 if (!sensor.EnableSensorEvents)
                 {
-                    if (_sensorOverlaps.TryGetValue(sensorId, out System.Collections.Generic.HashSet<int>? previousDisabled) &&
+                    if (_sensorOverlaps.TryGetValue(sensorId, out System.Collections.Generic.HashSet<Fixture>? previousDisabled) &&
                         previousDisabled.Count > 0)
                     {
-                        System.Collections.Generic.List<int> oldIds = new System.Collections.Generic.List<int>(previousDisabled);
-                        oldIds.Sort();
-                        for (int j = 0; j < oldIds.Count; ++j)
+                        System.Collections.Generic.List<Fixture> oldFixtures = new System.Collections.Generic.List<Fixture>(previousDisabled);
+                        oldFixtures.Sort(CompareFixturesByProxyId);
+                        for (int j = 0; j < oldFixtures.Count; ++j)
                         {
-                            int oldId = oldIds[j];
-                            Fixture? oldFixture = _broadPhase.GetUserData(oldId);
-                            sensorEndEvents.Add(new SensorEndEvent(sensor.UserData, oldFixture?.UserData));
+                            sensorEndEvents.Add(new SensorEndEvent(sensor.UserData, oldFixtures[j].UserData));
                         }
                         previousDisabled.Clear();
                     }
@@ -2926,7 +3065,7 @@ namespace Box2DNG
                 }
                 activeSensors.Add(sensorId);
 
-                System.Collections.Generic.List<int> overlaps = new System.Collections.Generic.List<int>();
+                System.Collections.Generic.List<Fixture> overlaps = new System.Collections.Generic.List<Fixture>();
                 Aabb queryBounds = sensor.Aabb;
                 _broadPhase.Query(proxyId =>
                 {
@@ -2948,17 +3087,17 @@ namespace Box2DNG
                         return true;
                     }
 
-                    overlaps.Add(other.ProxyId);
+                    overlaps.Add(other);
                     return true;
                 }, queryBounds);
 
                 if (overlaps.Count > 1)
                 {
-                    overlaps.Sort();
+                    overlaps.Sort(CompareFixturesByProxyId);
                     int unique = 1;
                     for (int k = 1; k < overlaps.Count; ++k)
                     {
-                        if (overlaps[k] != overlaps[unique - 1])
+                        if (!ReferenceEquals(overlaps[k], overlaps[unique - 1]))
                         {
                             overlaps[unique++] = overlaps[k];
                         }
@@ -2969,43 +3108,41 @@ namespace Box2DNG
                     }
                 }
 
-                if (!_sensorOverlaps.TryGetValue(sensorId, out System.Collections.Generic.HashSet<int>? previous))
+                if (!_sensorOverlaps.TryGetValue(sensorId, out System.Collections.Generic.HashSet<Fixture>? previous))
                 {
-                    previous = new System.Collections.Generic.HashSet<int>();
+                    previous = new System.Collections.Generic.HashSet<Fixture>();
                     _sensorOverlaps[sensorId] = previous;
                 }
 
-                System.Collections.Generic.HashSet<int> current = new System.Collections.Generic.HashSet<int>();
+                System.Collections.Generic.HashSet<Fixture> current = new System.Collections.Generic.HashSet<Fixture>();
                 for (int k = 0; k < overlaps.Count; ++k)
                 {
-                    int otherId = overlaps[k];
-                    current.Add(otherId);
+                    Fixture otherFixture = overlaps[k];
+                    current.Add(otherFixture);
 
+                    int otherId = otherFixture.ProxyId;
                     ContactKey key = new ContactKey(sensorId, otherId);
-                    _sensorPairs.Add(MakeProxyPairKey(sensorId, otherId));
+                    livePairs.Add(MakeProxyPairKey(sensorId, otherId));
+                    liveUserData[key] = (sensor.UserData, otherFixture.UserData);
 
-                    Fixture? otherFixture = _broadPhase.GetUserData(otherId);
-                    _sensorUserData[key] = (sensor.UserData, otherFixture?.UserData);
-
-                    if (!previous.Contains(otherId))
+                    if (!previous.Contains(otherFixture))
                     {
-                        sensorBeginEvents.Add(new SensorBeginEvent(sensor.UserData, otherFixture?.UserData));
+                        sensorBeginEvents.Add(new SensorBeginEvent(sensor.UserData, otherFixture.UserData));
                     }
                 }
 
-                foreach (int oldId in previous)
+                foreach (Fixture oldFixture in previous)
                 {
-                    if (!current.Contains(oldId))
+                    if (!current.Contains(oldFixture))
                     {
-                        Fixture? oldFixture = _broadPhase.GetUserData(oldId);
-                        sensorEndEvents.Add(new SensorEndEvent(sensor.UserData, oldFixture?.UserData));
+                        sensorEndEvents.Add(new SensorEndEvent(sensor.UserData, oldFixture.UserData));
                     }
                 }
 
                 previous.Clear();
-                foreach (int id in current)
+                foreach (Fixture fixture in current)
                 {
-                    previous.Add(id);
+                    previous.Add(fixture);
                 }
             }
 
@@ -3016,13 +3153,13 @@ namespace Box2DNG
                 {
                     if (!activeSensors.Contains(pair.Key))
                     {
-                        System.Collections.Generic.List<int> oldIds = new System.Collections.Generic.List<int>(pair.Value);
-                        oldIds.Sort();
-                        for (int i = 0; i < oldIds.Count; ++i)
+                        Fixture? sensorFixture = _broadPhase.GetUserData(pair.Key);
+                        object? sensorUserData = sensorFixture?.UserData;
+                        System.Collections.Generic.List<Fixture> oldFixtures = new System.Collections.Generic.List<Fixture>(pair.Value);
+                        oldFixtures.Sort(CompareFixturesByProxyId);
+                        for (int i = 0; i < oldFixtures.Count; ++i)
                         {
-                            int oldId = oldIds[i];
-                            Fixture? oldFixture = _broadPhase.GetUserData(oldId);
-                            sensorEndEvents.Add(new SensorEndEvent(null, oldFixture?.UserData));
+                            sensorEndEvents.Add(new SensorEndEvent(sensorUserData, oldFixtures[i].UserData));
                         }
                         remove.Add(pair.Key);
                     }
@@ -3034,10 +3171,23 @@ namespace Box2DNG
                 }
             }
 
+            _sensorPairs.Clear();
+            MergeSensorPairs(livePairs);
+            _sensorUserData.Clear();
+            foreach (var pair in liveUserData)
+            {
+                _sensorUserData[pair.Key] = pair.Value;
+            }
+
             if (sensorBeginEvents.Count > 0 || sensorEndEvents.Count > 0)
             {
                 _events.Raise(new SensorEvents(sensorBeginEvents.ToArray(), sensorEndEvents.ToArray()));
             }
+        }
+
+        private static int CompareFixturesByProxyId(Fixture a, Fixture b)
+        {
+            return a.ProxyId.CompareTo(b.ProxyId);
         }
 
         [System.Diagnostics.Conditional("DEBUG")]

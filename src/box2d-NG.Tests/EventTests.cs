@@ -113,6 +113,36 @@ namespace Box2DNG.Tests
         }
 
         [TestMethod]
+        public void SensorEvents_VisitorFixtureReplacement_EmitsEndThenBegin()
+        {
+            World world = new World(new WorldDef().WithGravity(Vec2.Zero));
+            Body sensorBody = world.CreateBody(new BodyDef().AsStatic().At(0f, 0f));
+            Body visitorBody = world.CreateBody(new BodyDef().AsDynamic().At(0f, 0f));
+
+            sensorBody.CreateFixture(new FixtureDef(new CircleShape(0.75f)).AsSensor().WithUserData("Sensor"));
+            Fixture visitor = visitorBody.CreateFixture(new FixtureDef(new CircleShape(0.5f)).WithUserData("VisitorA"));
+
+            int beginCount = 0;
+            int endCount = 0;
+            world.Events.SensorEvents += e =>
+            {
+                if (e.Begin != null) beginCount += e.Begin.Length;
+                if (e.End != null) endCount += e.End.Length;
+            };
+
+            world.UpdateContacts();
+            Assert.AreEqual(1, beginCount, "Expected initial begin event.");
+            Assert.AreEqual(0, endCount, "Expected no initial end event.");
+
+            visitorBody.DestroyFixture(visitor);
+            visitorBody.CreateFixture(new FixtureDef(new CircleShape(0.5f)).WithUserData("VisitorB"));
+            world.UpdateContacts();
+
+            Assert.IsTrue(endCount >= 1, "Expected end event for removed visitor overlap.");
+            Assert.IsTrue(beginCount >= 2, "Expected begin event for replacement visitor overlap.");
+        }
+
+        [TestMethod]
         public void SensorHitEvents_FireForBullets()
         {
             World world = new World(new WorldDef().WithGravity(new Vec2(0f, 0f)));

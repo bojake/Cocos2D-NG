@@ -240,6 +240,61 @@ namespace Box2DNG.Tests
             Assert.AreEqual(SolverSetType.Sleeping, contact.SolverSetType, "Expected contact to return to sleeping.");
             Assert.AreEqual(sleepingSetId, contact.SolverSetId, "Expected solver set id to be reused after sleep/wake cycle.");
         }
+
+        [TestMethod]
+        public void ConstraintGraph_ColorAssignmentOrder_IsDeterministic()
+        {
+            World world = new World(new WorldDef().WithGravity(Vec2.Zero).EnableSleeping(false));
+            MotionLocks locks = MotionLocks.LinearX | MotionLocks.LinearY | MotionLocks.AngularZ;
+            Body bodyA = world.CreateBody(new BodyDef().AsDynamic().At(0f, 0f).LockMotion(locks));
+            Body bodyB = world.CreateBody(new BodyDef().AsDynamic().At(1.2f, 0f).LockMotion(locks));
+            Body bodyC = world.CreateBody(new BodyDef().AsDynamic().At(0.6f, 1.0392f).LockMotion(locks));
+            bodyA.CreateFixture(new FixtureDef(new CircleShape(1f)).WithDensity(1f));
+            bodyB.CreateFixture(new FixtureDef(new CircleShape(1f)).WithDensity(1f));
+            bodyC.CreateFixture(new FixtureDef(new CircleShape(1f)).WithDensity(1f));
+
+            world.Step(1f / 60f);
+
+            Contact ab = FindContact(world, bodyA, bodyB);
+            Contact ac = FindContact(world, bodyA, bodyC);
+            Contact bc = FindContact(world, bodyB, bodyC);
+
+            Assert.AreEqual(0, ab.ColorIndex, "Expected AB to be assigned to graph color 0.");
+            Assert.AreEqual(1, ac.ColorIndex, "Expected AC to be assigned to graph color 1.");
+            Assert.AreEqual(2, bc.ColorIndex, "Expected BC to be assigned to graph color 2.");
+
+            for (int i = 0; i < 3; ++i)
+            {
+                world.Step(1f / 60f);
+            }
+
+            Assert.AreEqual(0, FindContact(world, bodyA, bodyB).ColorIndex, "Expected AB color to remain stable.");
+            Assert.AreEqual(1, FindContact(world, bodyA, bodyC).ColorIndex, "Expected AC color to remain stable.");
+            Assert.AreEqual(2, FindContact(world, bodyB, bodyC).ColorIndex, "Expected BC color to remain stable.");
+        }
+
+        private static Contact FindContact(World world, Body bodyA, Body bodyB)
+        {
+            for (int i = 0; i < world.Contacts.Count; ++i)
+            {
+                Contact contact = world.Contacts[i];
+                if (contact.FixtureA == null || contact.FixtureB == null)
+                {
+                    continue;
+                }
+
+                Body a = contact.FixtureA.Body;
+                Body b = contact.FixtureB.Body;
+                if ((a == bodyA && b == bodyB) || (a == bodyB && b == bodyA))
+                {
+                    return contact;
+                }
+            }
+
+            Assert.Fail("Expected contact between requested bodies.");
+            return null!;
+        }
+
         [TestMethod]
         public void HashSet64_AddRemoveContains_TracksCount()
         {
