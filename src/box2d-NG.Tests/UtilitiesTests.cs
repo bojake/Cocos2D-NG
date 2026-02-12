@@ -417,5 +417,122 @@ namespace Box2DNG.Tests
                 Box2D.DestroyWorld(second);
             }
         }
+
+        [TestMethod]
+        public void WorldHandle_StaleIdsInvalidAcrossSlotChurn()
+        {
+            const int iterations = 12;
+            System.Collections.Generic.List<WorldId> stale = new System.Collections.Generic.List<WorldId>(iterations);
+
+            WorldId current = Box2D.CreateWorld(new WorldDef().WithGravity(Vec2.Zero));
+            stale.Add(current);
+
+            for (int i = 0; i < iterations - 1; ++i)
+            {
+                Assert.IsTrue(Box2D.DestroyWorld(current), $"Expected destroy in churn iteration {i}.");
+                current = Box2D.CreateWorld(new WorldDef().WithGravity(Vec2.Zero));
+                stale.Add(current);
+            }
+
+            try
+            {
+                for (int i = 0; i < stale.Count - 1; ++i)
+                {
+                    WorldId id = stale[i];
+                    Assert.IsFalse(Box2D.IsValid(id), $"Expected stale id[{i}] to be invalid.");
+                    Assert.IsFalse(Box2D.TryGetWorld(id, out _), $"Expected stale id[{i}] lookup to fail.");
+                }
+
+                Assert.IsTrue(Box2D.IsValid(current), "Expected newest id to remain valid.");
+            }
+            finally
+            {
+                Box2D.DestroyWorld(current);
+            }
+        }
+
+        [TestMethod]
+        public void WorldHandle_MaxWorldsBoundary_EnforcedAndRecoverable()
+        {
+            const int maxWorlds = 128;
+            System.Collections.Generic.List<WorldId> ids = new System.Collections.Generic.List<WorldId>(maxWorlds);
+
+            try
+            {
+                for (int i = 0; i < maxWorlds; ++i)
+                {
+                    ids.Add(Box2D.CreateWorld(new WorldDef().WithGravity(Vec2.Zero)));
+                }
+
+                Assert.ThrowsException<System.InvalidOperationException>(
+                    () => Box2D.CreateWorld(new WorldDef().WithGravity(Vec2.Zero)),
+                    "Expected create to fail once world slots are exhausted.");
+
+                WorldId victim = ids[0];
+                Assert.IsTrue(Box2D.DestroyWorld(victim), "Expected destroy at boundary.");
+                ids.RemoveAt(0);
+
+                WorldId reused = Box2D.CreateWorld(new WorldDef().WithGravity(Vec2.Zero));
+                try
+                {
+                    Assert.AreEqual(victim.Index1, reused.Index1, "Expected boundary slot reuse.");
+                    Assert.AreNotEqual(victim.Generation, reused.Generation, "Expected generation increment after boundary reuse.");
+                }
+                finally
+                {
+                    Box2D.DestroyWorld(reused);
+                }
+            }
+            finally
+            {
+                for (int i = 0; i < ids.Count; ++i)
+                {
+                    Box2D.DestroyWorld(ids[i]);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void ArenaAllocator_LifoAllocFree_TracksAllocation()
+        {
+            ArenaAllocator arena = new ArenaAllocator(256);
+
+            ArenaBlock bytes = arena.AllocateBytes(48, "bytes");
+            int[] ints = arena.AllocateArray<int>(10, "ints");
+            float[] floats = arena.AllocateArray<float>(8, "floats");
+
+            Assert.IsTrue(arena.Allocation > 0, "Expected outstanding allocation.");
+            int peak = arena.MaxAllocation;
+            Assert.IsTrue(peak >= arena.Allocation, "Expected max allocation to track peak.");
+
+            arena.FreeArray(floats);
+            arena.FreeArray(ints);
+            arena.FreeBytes(bytes);
+
+            Assert.AreEqual(0, arena.Allocation, "Expected allocation to return to zero after LIFO frees.");
+            Assert.AreEqual(peak, arena.MaxAllocation, "Expected max allocation to preserve peak usage.");
+
+            arena.Destroy();
+            Assert.AreEqual(0, arena.Capacity, "Expected destroy to clear capacity.");
+        }
+
+        [TestMethod]
+        public void ArenaAllocator_Grow_ExpandsCapacityToPeak()
+        {
+            ArenaAllocator arena = new ArenaAllocator(64);
+            int initialCapacity = arena.Capacity;
+
+            int[] large = arena.AllocateArray<int>(256, "large");
+            int peak = arena.MaxAllocation;
+            Assert.IsTrue(peak > initialCapacity, "Expected peak to exceed initial capacity.");
+
+            arena.FreeArray(large);
+            Assert.AreEqual(0, arena.Allocation, "Expected zero outstanding allocation before grow.");
+
+            arena.Grow();
+            Assert.IsTrue(arena.Capacity > initialCapacity, "Expected grow to increase capacity.");
+
+            arena.Destroy();
+        }
     }
 }
