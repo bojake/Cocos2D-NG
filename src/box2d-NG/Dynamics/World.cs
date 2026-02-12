@@ -2,7 +2,7 @@ using System;
 
 namespace Box2DNG
 {
-    public sealed partial class World
+    public sealed partial class World : System.IDisposable
     {
         private readonly WorldDef _def;
         private readonly WorldEvents _events = new WorldEvents();
@@ -50,6 +50,9 @@ namespace Box2DNG
         private readonly IdPool _solverSetIdPool = new IdPool();
         private readonly IdPool _contactEdgeIdPool = new IdPool();
         private readonly ConstraintGraph _constraintGraph = new ConstraintGraph(8);
+        private readonly ArenaAllocator _arena;
+        private bool _disposed;
+        private WorldId _worldId;
         private readonly System.Collections.Generic.Dictionary<JointHandle, int> _jointColorIndices =
             new System.Collections.Generic.Dictionary<JointHandle, int>();
         private readonly System.Collections.Generic.Dictionary<JointHandle, int> _jointLocalIndices =
@@ -61,6 +64,8 @@ namespace Box2DNG
             _solverPipeline = new SolverPipeline(this);
             _contactSolver = new ContactSolver(this);
             _contactSolverSimd = new ContactSolverSimd(this);
+            _arena = new ArenaAllocator(_def.ArenaCapacity);
+            _worldId = default;
         }
 
         public readonly struct ContactSolverStats
@@ -89,6 +94,107 @@ namespace Box2DNG
             }
         }
 
+        public readonly struct AllocationStats
+        {
+            public readonly int BodyCount;
+            public readonly int FixtureCount;
+            public readonly int JointCount;
+            public readonly int ContactCount;
+            public readonly int IslandCount;
+            public readonly int SleepingSetCount;
+            public readonly int BodyIdCapacity;
+            public readonly int BodyIdCount;
+            public readonly int FixtureIdCapacity;
+            public readonly int FixtureIdCount;
+            public readonly int JointIdCapacity;
+            public readonly int JointIdCount;
+            public readonly int ContactIdCapacity;
+            public readonly int ContactIdCount;
+            public readonly int IslandIdCapacity;
+            public readonly int IslandIdCount;
+            public readonly int SolverSetIdCapacity;
+            public readonly int SolverSetIdCount;
+            public readonly int ContactEdgeIdCapacity;
+            public readonly int ContactEdgeIdCount;
+            public readonly int SensorPairCapacity;
+            public readonly int SensorPairCount;
+            public readonly int BodyIdPoolBytes;
+            public readonly int FixtureIdPoolBytes;
+            public readonly int JointIdPoolBytes;
+            public readonly int ContactIdPoolBytes;
+            public readonly int IslandIdPoolBytes;
+            public readonly int SolverSetIdPoolBytes;
+            public readonly int ContactEdgeIdPoolBytes;
+            public readonly int SensorPairBytes;
+            public readonly int AllocatorBytes;
+
+            public AllocationStats(
+                int bodyCount,
+                int fixtureCount,
+                int jointCount,
+                int contactCount,
+                int islandCount,
+                int sleepingSetCount,
+                int bodyIdCapacity,
+                int bodyIdCount,
+                int fixtureIdCapacity,
+                int fixtureIdCount,
+                int jointIdCapacity,
+                int jointIdCount,
+                int contactIdCapacity,
+                int contactIdCount,
+                int islandIdCapacity,
+                int islandIdCount,
+                int solverSetIdCapacity,
+                int solverSetIdCount,
+                int contactEdgeIdCapacity,
+                int contactEdgeIdCount,
+                int sensorPairCapacity,
+                int sensorPairCount,
+                int bodyIdPoolBytes,
+                int fixtureIdPoolBytes,
+                int jointIdPoolBytes,
+                int contactIdPoolBytes,
+                int islandIdPoolBytes,
+                int solverSetIdPoolBytes,
+                int contactEdgeIdPoolBytes,
+                int sensorPairBytes,
+                int allocatorBytes)
+            {
+                BodyCount = bodyCount;
+                FixtureCount = fixtureCount;
+                JointCount = jointCount;
+                ContactCount = contactCount;
+                IslandCount = islandCount;
+                SleepingSetCount = sleepingSetCount;
+                BodyIdCapacity = bodyIdCapacity;
+                BodyIdCount = bodyIdCount;
+                FixtureIdCapacity = fixtureIdCapacity;
+                FixtureIdCount = fixtureIdCount;
+                JointIdCapacity = jointIdCapacity;
+                JointIdCount = jointIdCount;
+                ContactIdCapacity = contactIdCapacity;
+                ContactIdCount = contactIdCount;
+                IslandIdCapacity = islandIdCapacity;
+                IslandIdCount = islandIdCount;
+                SolverSetIdCapacity = solverSetIdCapacity;
+                SolverSetIdCount = solverSetIdCount;
+                ContactEdgeIdCapacity = contactEdgeIdCapacity;
+                ContactEdgeIdCount = contactEdgeIdCount;
+                SensorPairCapacity = sensorPairCapacity;
+                SensorPairCount = sensorPairCount;
+                BodyIdPoolBytes = bodyIdPoolBytes;
+                FixtureIdPoolBytes = fixtureIdPoolBytes;
+                JointIdPoolBytes = jointIdPoolBytes;
+                ContactIdPoolBytes = contactIdPoolBytes;
+                IslandIdPoolBytes = islandIdPoolBytes;
+                SolverSetIdPoolBytes = solverSetIdPoolBytes;
+                ContactEdgeIdPoolBytes = contactEdgeIdPoolBytes;
+                SensorPairBytes = sensorPairBytes;
+                AllocatorBytes = allocatorBytes;
+            }
+        }
+
         public Vec2 Gravity => _def.Gravity;
 
         public WorldEvents Events => _events;
@@ -112,6 +218,69 @@ namespace Box2DNG
         public SolverSet StaticSet => _staticSet;
         public SolverSet DisabledSet => _disabledSet;
         public ContactSolverStats LastContactSolverStats => _lastContactSolverStats;
+        public WorldId Id => _worldId;
+        public AllocationStats GetAllocationStats()
+        {
+            return new AllocationStats(
+                _bodies.Count,
+                CountFixtures(),
+                CountJoints(),
+                _contactMap.Count,
+                _lastIslands.Count,
+                _sleepingIslandSets.Count,
+                _bodyIdPool.Capacity,
+                _bodyIdPool.Count,
+                _fixtureIdPool.Capacity,
+                _fixtureIdPool.Count,
+                _jointIdPool.Capacity,
+                _jointIdPool.Count,
+                _contactIdPool.Capacity,
+                _contactIdPool.Count,
+                _islandIdPool.Capacity,
+                _islandIdPool.Count,
+                _solverSetIdPool.Capacity,
+                _solverSetIdPool.Count,
+                _contactEdgeIdPool.Capacity,
+                _contactEdgeIdPool.Count,
+                _sensorPairs.Capacity,
+                _sensorPairs.Count,
+                _bodyIdPool.ByteCount,
+                _fixtureIdPool.ByteCount,
+                _jointIdPool.ByteCount,
+                _contactIdPool.ByteCount,
+                _islandIdPool.ByteCount,
+                _solverSetIdPool.ByteCount,
+                _contactEdgeIdPool.ByteCount,
+                _sensorPairs.GetByteCount(),
+                Box2D.GetByteCount());
+        }
+
+        internal void SetWorldId(WorldId id)
+        {
+            _worldId = id;
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _arena.Destroy();
+            _disposed = true;
+        }
+
+        ~World()
+        {
+            Dispose(disposing: false);
+        }
         public int? GetIslandId(Body body)
         {
             if (_bodyIslandIds.TryGetValue(body, out int id))
@@ -531,31 +700,37 @@ namespace Box2DNG
         private System.Collections.Generic.List<Island> BuildAllIslands(IslandAdjacency adjacency)
         {
             System.Collections.Generic.List<Island> islands = new System.Collections.Generic.List<Island>();
-            bool[] bodyVisited = new bool[_bodies.Count];
+            bool[] bodyVisited = _arena.AllocateArray<bool>(_bodies.Count, "build_all_islands_body_visited");
             System.Collections.Generic.HashSet<Contact> contactAdded = new System.Collections.Generic.HashSet<Contact>();
             System.Collections.Generic.HashSet<JointHandle> jointAdded = new System.Collections.Generic.HashSet<JointHandle>();
             System.Collections.Generic.Stack<int> stack = new System.Collections.Generic.Stack<int>();
-
-            for (int i = 0; i < _bodies.Count; ++i)
+            try
             {
-                Body body = _bodies[i];
-                if (body.Type == BodyType.Static)
+                for (int i = 0; i < _bodies.Count; ++i)
                 {
-                    continue;
-                }
-                if (bodyVisited[i])
-                {
-                    continue;
-                }
+                    Body body = _bodies[i];
+                    if (body.Type == BodyType.Static)
+                    {
+                        continue;
+                    }
+                    if (bodyVisited[i])
+                    {
+                        continue;
+                    }
 
-                Island island = new Island();
-                stack.Push(i);
-                bodyVisited[i] = true;
-                BuildIslandFromSeed(adjacency, island, stack, bodyVisited, contactAdded, jointAdded);
-                if (island.Bodies.Count > 0)
-                {
-                    islands.Add(island);
+                    Island island = new Island();
+                    stack.Push(i);
+                    bodyVisited[i] = true;
+                    BuildIslandFromSeed(adjacency, island, stack, bodyVisited, contactAdded, jointAdded);
+                    if (island.Bodies.Count > 0)
+                    {
+                        islands.Add(island);
+                    }
                 }
+            }
+            finally
+            {
+                _arena.FreeArray(bodyVisited);
             }
 
             return islands;
@@ -563,212 +738,225 @@ namespace Box2DNG
 
         private System.Collections.Generic.List<Island> BuildDirtyIslands(IslandAdjacency adjacency, bool awakeOnly)
         {
-            bool[] dirtyBodies = new bool[_bodies.Count];
+            bool[] dirtyBodies = _arena.AllocateArray<bool>(_bodies.Count, "build_dirty_islands_dirty_bodies");
             System.Collections.Generic.List<int> splitSeeds = new System.Collections.Generic.List<int>();
-            for (int i = 0; i < _lastIslands.Count; ++i)
+            try
             {
-                Island island = _lastIslands[i];
-                if (!island.IsAwake || island.ConstraintRemoveCount == 0)
-                {
-                    continue;
-                }
-
-                for (int b = 0; b < island.Bodies.Count; ++b)
-                {
-                    Body body = island.Bodies[b];
-                    if (body.Type == BodyType.Static)
-                    {
-                        continue;
-                    }
-                    if (awakeOnly && !body.Awake)
-                    {
-                        continue;
-                    }
-                    if (adjacency.BodyIndex.TryGetValue(body, out int bodyIndex))
-                    {
-                        dirtyBodies[bodyIndex] = true;
-                        splitSeeds.Add(bodyIndex);
-                    }
-                }
-            }
-
-            foreach (int islandId in _dirtyIslandIds)
-            {
-                if (islandId < 0 || islandId >= _lastIslands.Count)
-                {
-                    continue;
-                }
-
-                Island island = _lastIslands[islandId];
-                if (awakeOnly && !island.IsAwake)
-                {
-                    continue;
-                }
-                for (int b = 0; b < island.Bodies.Count; ++b)
-                {
-                    Body body = island.Bodies[b];
-                    if (body.Type == BodyType.Static)
-                    {
-                        continue;
-                    }
-                    if (awakeOnly && !body.Awake)
-                    {
-                        continue;
-                    }
-                    if (adjacency.BodyIndex.TryGetValue(body, out int bodyIndex))
-                    {
-                        dirtyBodies[bodyIndex] = true;
-                    }
-                }
-            }
-
-            System.Collections.Generic.List<Island> islands = new System.Collections.Generic.List<Island>();
-            bool[] bodyVisited = new bool[_bodies.Count];
-            System.Collections.Generic.HashSet<Contact> contactAdded = new System.Collections.Generic.HashSet<Contact>();
-            System.Collections.Generic.HashSet<JointHandle> jointAdded = new System.Collections.Generic.HashSet<JointHandle>();
-            System.Collections.Generic.Stack<int> stack = new System.Collections.Generic.Stack<int>();
-
-            if (splitSeeds.Count > 0 && _dirtyIslandIds.Count == 0)
-            {
-                splitSeeds.Sort();
-                for (int i = 0; i < splitSeeds.Count; ++i)
-                {
-                    int seedIndex = splitSeeds[i];
-                    if (bodyVisited[seedIndex])
-                    {
-                        continue;
-                    }
-
-                    Body body = _bodies[seedIndex];
-                    if (body.Type == BodyType.Static)
-                    {
-                        continue;
-                    }
-                    if (awakeOnly && !body.Awake)
-                    {
-                        continue;
-                    }
-
-                    Island island = new Island();
-                    stack.Push(seedIndex);
-                    bodyVisited[seedIndex] = true;
-                    BuildIslandFromSeed(adjacency, island, stack, bodyVisited, contactAdded, jointAdded);
-                    if (island.Bodies.Count > 0)
-                    {
-                        island.ConstraintRemoveCount = 0;
-                        islands.Add(island);
-                    }
-                }
-
                 for (int i = 0; i < _lastIslands.Count; ++i)
                 {
                     Island island = _lastIslands[i];
-                    bool rebuilt = false;
+                    if (!island.IsAwake || island.ConstraintRemoveCount == 0)
+                    {
+                        continue;
+                    }
+
                     for (int b = 0; b < island.Bodies.Count; ++b)
                     {
                         Body body = island.Bodies[b];
-                        if (adjacency.BodyIndex.TryGetValue(body, out int bodyIndex) && bodyVisited[bodyIndex])
+                        if (body.Type == BodyType.Static)
                         {
-                            rebuilt = true;
-                            break;
+                            continue;
+                        }
+                        if (awakeOnly && !body.Awake)
+                        {
+                            continue;
+                        }
+                        if (adjacency.BodyIndex.TryGetValue(body, out int bodyIndex))
+                        {
+                            dirtyBodies[bodyIndex] = true;
+                            splitSeeds.Add(bodyIndex);
                         }
                     }
-                    if (!rebuilt)
-                    {
-                        islands.Add(island);
-                    }
                 }
 
-                islands.Sort((a, b) => GetIslandSortKey(adjacency.BodyIndex, a).CompareTo(GetIslandSortKey(adjacency.BodyIndex, b)));
-                return islands;
-            }
-
-            if (splitSeeds.Count > 0)
-            {
-                splitSeeds.Sort();
-                for (int i = 0; i < splitSeeds.Count; ++i)
+                foreach (int islandId in _dirtyIslandIds)
                 {
-                    int seedIndex = splitSeeds[i];
-                    if (bodyVisited[seedIndex])
+                    if (islandId < 0 || islandId >= _lastIslands.Count)
                     {
                         continue;
                     }
 
-                    Body body = _bodies[seedIndex];
-                    if (body.Type == BodyType.Static)
+                    Island island = _lastIslands[islandId];
+                    if (awakeOnly && !island.IsAwake)
                     {
                         continue;
                     }
-                    if (awakeOnly && !body.Awake)
+                    for (int b = 0; b < island.Bodies.Count; ++b)
                     {
-                        continue;
-                    }
-
-                    Island island = new Island();
-                    stack.Push(seedIndex);
-                    bodyVisited[seedIndex] = true;
-                    BuildIslandFromSeed(adjacency, island, stack, bodyVisited, contactAdded, jointAdded);
-                    if (island.Bodies.Count > 0)
-                    {
-                        island.ConstraintRemoveCount = 0;
-                        islands.Add(island);
+                        Body body = island.Bodies[b];
+                        if (body.Type == BodyType.Static)
+                        {
+                            continue;
+                        }
+                        if (awakeOnly && !body.Awake)
+                        {
+                            continue;
+                        }
+                        if (adjacency.BodyIndex.TryGetValue(body, out int bodyIndex))
+                        {
+                            dirtyBodies[bodyIndex] = true;
+                        }
                     }
                 }
-            }
 
-            for (int i = 0; i < _bodies.Count; ++i)
+                System.Collections.Generic.List<Island> islands = new System.Collections.Generic.List<Island>();
+                bool[] bodyVisited = _arena.AllocateArray<bool>(_bodies.Count, "build_dirty_islands_body_visited");
+                try
+                {
+                    System.Collections.Generic.HashSet<Contact> contactAdded = new System.Collections.Generic.HashSet<Contact>();
+                    System.Collections.Generic.HashSet<JointHandle> jointAdded = new System.Collections.Generic.HashSet<JointHandle>();
+                    System.Collections.Generic.Stack<int> stack = new System.Collections.Generic.Stack<int>();
+                    if (splitSeeds.Count > 0 && _dirtyIslandIds.Count == 0)
+                    {
+                        splitSeeds.Sort();
+                        for (int i = 0; i < splitSeeds.Count; ++i)
+                        {
+                            int seedIndex = splitSeeds[i];
+                            if (bodyVisited[seedIndex])
+                            {
+                                continue;
+                            }
+
+                            Body body = _bodies[seedIndex];
+                            if (body.Type == BodyType.Static)
+                            {
+                                continue;
+                            }
+                            if (awakeOnly && !body.Awake)
+                            {
+                                continue;
+                            }
+
+                            Island island = new Island();
+                            stack.Push(seedIndex);
+                            bodyVisited[seedIndex] = true;
+                            BuildIslandFromSeed(adjacency, island, stack, bodyVisited, contactAdded, jointAdded);
+                            if (island.Bodies.Count > 0)
+                            {
+                                island.ConstraintRemoveCount = 0;
+                                islands.Add(island);
+                            }
+                        }
+
+                        for (int i = 0; i < _lastIslands.Count; ++i)
+                        {
+                            Island island = _lastIslands[i];
+                            bool rebuilt = false;
+                            for (int b = 0; b < island.Bodies.Count; ++b)
+                            {
+                                Body body = island.Bodies[b];
+                                if (adjacency.BodyIndex.TryGetValue(body, out int bodyIndex) && bodyVisited[bodyIndex])
+                                {
+                                    rebuilt = true;
+                                    break;
+                                }
+                            }
+                            if (!rebuilt)
+                            {
+                                islands.Add(island);
+                            }
+                        }
+
+                        islands.Sort((a, b) => GetIslandSortKey(adjacency.BodyIndex, a).CompareTo(GetIslandSortKey(adjacency.BodyIndex, b)));
+                        return islands;
+                    }
+
+                    if (splitSeeds.Count > 0)
+                    {
+                        splitSeeds.Sort();
+                        for (int i = 0; i < splitSeeds.Count; ++i)
+                        {
+                            int seedIndex = splitSeeds[i];
+                            if (bodyVisited[seedIndex])
+                            {
+                                continue;
+                            }
+
+                            Body body = _bodies[seedIndex];
+                            if (body.Type == BodyType.Static)
+                            {
+                                continue;
+                            }
+                            if (awakeOnly && !body.Awake)
+                            {
+                                continue;
+                            }
+
+                            Island island = new Island();
+                            stack.Push(seedIndex);
+                            bodyVisited[seedIndex] = true;
+                            BuildIslandFromSeed(adjacency, island, stack, bodyVisited, contactAdded, jointAdded);
+                            if (island.Bodies.Count > 0)
+                            {
+                                island.ConstraintRemoveCount = 0;
+                                islands.Add(island);
+                            }
+                        }
+                    }
+
+                    for (int i = 0; i < _bodies.Count; ++i)
+                    {
+                        if (!dirtyBodies[i])
+                        {
+                            continue;
+                        }
+
+                        Body body = _bodies[i];
+                        if (body.Type == BodyType.Static)
+                        {
+                            continue;
+                        }
+                        if (awakeOnly && !body.Awake)
+                        {
+                            continue;
+                        }
+                        if (bodyVisited[i])
+                        {
+                            continue;
+                        }
+
+                        Island island = new Island();
+                        stack.Push(i);
+                        bodyVisited[i] = true;
+                        BuildIslandFromSeed(adjacency, island, stack, bodyVisited, contactAdded, jointAdded);
+                        if (island.Bodies.Count > 0)
+                        {
+                            island.ConstraintRemoveCount = 0;
+                            islands.Add(island);
+                        }
+                    }
+
+                    for (int i = 0; i < _lastIslands.Count; ++i)
+                    {
+                        Island island = _lastIslands[i];
+                        bool rebuilt = false;
+                        for (int b = 0; b < island.Bodies.Count; ++b)
+                        {
+                            Body body = island.Bodies[b];
+                            if (adjacency.BodyIndex.TryGetValue(body, out int bodyIndex) && bodyVisited[bodyIndex])
+                            {
+                                rebuilt = true;
+                                break;
+                            }
+                        }
+                        if (!rebuilt)
+                        {
+                            islands.Add(island);
+                        }
+                    }
+
+                    islands.Sort((a, b) => GetIslandSortKey(adjacency.BodyIndex, a).CompareTo(GetIslandSortKey(adjacency.BodyIndex, b)));
+                    return islands;
+                }
+                finally
+                {
+                    _arena.FreeArray(bodyVisited);
+                }
+            }
+            finally
             {
-                if (!dirtyBodies[i])
-                {
-                    continue;
-                }
-
-                Body body = _bodies[i];
-                if (body.Type == BodyType.Static)
-                {
-                    continue;
-                }
-                if (awakeOnly && !body.Awake)
-                {
-                    continue;
-                }
-                if (bodyVisited[i])
-                {
-                    continue;
-                }
-
-                Island island = new Island();
-                stack.Push(i);
-                bodyVisited[i] = true;
-                BuildIslandFromSeed(adjacency, island, stack, bodyVisited, contactAdded, jointAdded);
-                if (island.Bodies.Count > 0)
-                {
-                    island.ConstraintRemoveCount = 0;
-                    islands.Add(island);
-                }
+                _arena.FreeArray(dirtyBodies);
             }
-
-            for (int i = 0; i < _lastIslands.Count; ++i)
-            {
-                Island island = _lastIslands[i];
-                bool rebuilt = false;
-                for (int b = 0; b < island.Bodies.Count; ++b)
-                {
-                    Body body = island.Bodies[b];
-                    if (adjacency.BodyIndex.TryGetValue(body, out int bodyIndex) && bodyVisited[bodyIndex])
-                    {
-                        rebuilt = true;
-                        break;
-                    }
-                }
-                if (!rebuilt)
-                {
-                    islands.Add(island);
-                }
-            }
-
-            islands.Sort((a, b) => GetIslandSortKey(adjacency.BodyIndex, a).CompareTo(GetIslandSortKey(adjacency.BodyIndex, b)));
-            return islands;
         }
 
         private static int GetIslandSortKey(System.Collections.Generic.Dictionary<Body, int> bodyIndex, Island island)
@@ -821,138 +1009,144 @@ namespace Box2DNG
         private System.Collections.Generic.List<Island> SplitAwakeIslands(IslandAdjacency adjacency, System.Collections.Generic.List<Island> islands)
         {
             System.Collections.Generic.List<Island> results = new System.Collections.Generic.List<Island>(islands.Count);
-            bool[] inIsland = new bool[_bodies.Count];
-            bool[] visited = new bool[_bodies.Count];
+            bool[] inIsland = _arena.AllocateArray<bool>(_bodies.Count, "split_awake_islands_in_island");
+            bool[] visited = _arena.AllocateArray<bool>(_bodies.Count, "split_awake_islands_visited");
             System.Collections.Generic.Stack<int> stack = new System.Collections.Generic.Stack<int>();
-
-            for (int islandIndex = 0; islandIndex < islands.Count; ++islandIndex)
+            try
             {
-                Island island = islands[islandIndex];
-                if (!island.IsAwake || island.ConstraintRemoveCount == 0 || island.Bodies.Count <= 1)
+                for (int islandIndex = 0; islandIndex < islands.Count; ++islandIndex)
                 {
-                    results.Add(island);
-                    island.ConstraintRemoveCount = 0;
-                    continue;
-                }
-
-                Array.Clear(inIsland, 0, inIsland.Length);
-                Array.Clear(visited, 0, visited.Length);
-
-                System.Collections.Generic.List<int> seeds = new System.Collections.Generic.List<int>(island.Bodies.Count);
-                for (int i = 0; i < island.Bodies.Count; ++i)
-                {
-                    Body body = island.Bodies[i];
-                    if (adjacency.BodyIndex.TryGetValue(body, out int bodyIndex))
+                    Island island = islands[islandIndex];
+                    if (!island.IsAwake || island.ConstraintRemoveCount == 0 || island.Bodies.Count <= 1)
                     {
-                        inIsland[bodyIndex] = true;
-                        seeds.Add(bodyIndex);
-                    }
-                }
-
-                seeds.Sort();
-                System.Collections.Generic.HashSet<Contact> contactAdded = new System.Collections.Generic.HashSet<Contact>();
-                System.Collections.Generic.HashSet<JointHandle> jointAdded = new System.Collections.Generic.HashSet<JointHandle>();
-
-                for (int i = 0; i < seeds.Count; ++i)
-                {
-                    int seedIndex = seeds[i];
-                    if (visited[seedIndex])
-                    {
+                        results.Add(island);
+                        island.ConstraintRemoveCount = 0;
                         continue;
                     }
+                    Array.Clear(inIsland, 0, inIsland.Length);
+                    Array.Clear(visited, 0, visited.Length);
 
-                    Island split = new Island();
-                    stack.Push(seedIndex);
-                    visited[seedIndex] = true;
-
-                    while (stack.Count > 0)
+                    System.Collections.Generic.List<int> seeds = new System.Collections.Generic.List<int>(island.Bodies.Count);
+                    for (int i = 0; i < island.Bodies.Count; ++i)
                     {
-                        int bodyIndexValue = stack.Pop();
-                        if (!inIsland[bodyIndexValue])
+                        Body body = island.Bodies[i];
+                        if (adjacency.BodyIndex.TryGetValue(body, out int bodyIndex))
+                        {
+                            inIsland[bodyIndex] = true;
+                            seeds.Add(bodyIndex);
+                        }
+                    }
+
+                    seeds.Sort();
+                    System.Collections.Generic.HashSet<Contact> contactAdded = new System.Collections.Generic.HashSet<Contact>();
+                    System.Collections.Generic.HashSet<JointHandle> jointAdded = new System.Collections.Generic.HashSet<JointHandle>();
+
+                    for (int i = 0; i < seeds.Count; ++i)
+                    {
+                        int seedIndex = seeds[i];
+                        if (visited[seedIndex])
                         {
                             continue;
                         }
 
-                        Body node = _bodies[bodyIndexValue];
-                        split.Bodies.Add(node);
+                        Island split = new Island();
+                        stack.Push(seedIndex);
+                        visited[seedIndex] = true;
 
-                        foreach (Contact contact in adjacency.BodyContacts[bodyIndexValue])
+                        while (stack.Count > 0)
                         {
-                            if (!contact.IsTouching)
+                            int bodyIndexValue = stack.Pop();
+                            if (!inIsland[bodyIndexValue])
                             {
                                 continue;
                             }
 
-                            Fixture? fixtureA = contact.FixtureA;
-                            Fixture? fixtureB = contact.FixtureB;
-                            if (fixtureA == null || fixtureB == null)
+                            Body node = _bodies[bodyIndexValue];
+                            split.Bodies.Add(node);
+
+                            foreach (Contact contact in adjacency.BodyContacts[bodyIndexValue])
                             {
-                                continue;
+                                if (!contact.IsTouching)
+                                {
+                                    continue;
+                                }
+
+                                Fixture? fixtureA = contact.FixtureA;
+                                Fixture? fixtureB = contact.FixtureB;
+                                if (fixtureA == null || fixtureB == null)
+                                {
+                                    continue;
+                                }
+
+                                int otherIndex = fixtureA.Body == node ? adjacency.BodyIndex[fixtureB.Body] : adjacency.BodyIndex[fixtureA.Body];
+                                if (!inIsland[otherIndex])
+                                {
+                                    continue;
+                                }
+
+                                if (contactAdded.Add(contact))
+                                {
+                                    split.Contacts.Add(contact);
+                                }
+
+                                Body otherBody = _bodies[otherIndex];
+                                if (otherBody.Type == BodyType.Static)
+                                {
+                                    continue;
+                                }
+                                if (!visited[otherIndex])
+                                {
+                                    visited[otherIndex] = true;
+                                    stack.Push(otherIndex);
+                                }
                             }
 
-                            int otherIndex = fixtureA.Body == node ? adjacency.BodyIndex[fixtureB.Body] : adjacency.BodyIndex[fixtureA.Body];
-                            if (!inIsland[otherIndex])
+                            foreach (JointHandle handle in adjacency.BodyJoints[bodyIndexValue])
                             {
-                                continue;
-                            }
+                                Body? otherBody = GetJointOtherBody(handle, node);
+                                if (otherBody == null || otherBody.Type == BodyType.Static)
+                                {
+                                    continue;
+                                }
+                                if (node.Type != BodyType.Dynamic && otherBody.Type != BodyType.Dynamic)
+                                {
+                                    continue;
+                                }
 
-                            if (contactAdded.Add(contact))
-                            {
-                                split.Contacts.Add(contact);
-                            }
+                                if (!adjacency.BodyIndex.TryGetValue(otherBody, out int otherIndex) || !inIsland[otherIndex])
+                                {
+                                    continue;
+                                }
 
-                            Body otherBody = _bodies[otherIndex];
-                            if (otherBody.Type == BodyType.Static)
-                            {
-                                continue;
-                            }
-                            if (!visited[otherIndex])
-                            {
-                                visited[otherIndex] = true;
-                                stack.Push(otherIndex);
+                                if (jointAdded.Add(handle))
+                                {
+                                    split.Joints.Add(handle);
+                                }
+
+                                if (!visited[otherIndex])
+                                {
+                                    visited[otherIndex] = true;
+                                    stack.Push(otherIndex);
+                                }
                             }
                         }
 
-                        foreach (JointHandle handle in adjacency.BodyJoints[bodyIndexValue])
+                        split.ConstraintRemoveCount = 0;
+                        if (split.Bodies.Count > 0)
                         {
-                            Body? otherBody = GetJointOtherBody(handle, node);
-                            if (otherBody == null || otherBody.Type == BodyType.Static)
-                            {
-                                continue;
-                            }
-                            if (node.Type != BodyType.Dynamic && otherBody.Type != BodyType.Dynamic)
-                            {
-                                continue;
-                            }
-
-                            if (!adjacency.BodyIndex.TryGetValue(otherBody, out int otherIndex) || !inIsland[otherIndex])
-                            {
-                                continue;
-                            }
-
-                            if (jointAdded.Add(handle))
-                            {
-                                split.Joints.Add(handle);
-                            }
-
-                            if (!visited[otherIndex])
-                            {
-                                visited[otherIndex] = true;
-                                stack.Push(otherIndex);
-                            }
+                            results.Add(split);
                         }
-                    }
-
-                    split.ConstraintRemoveCount = 0;
-                    if (split.Bodies.Count > 0)
-                    {
-                        results.Add(split);
                     }
                 }
-            }
 
-            results.Sort((a, b) => GetIslandSortKey(adjacency.BodyIndex, a).CompareTo(GetIslandSortKey(adjacency.BodyIndex, b)));
-            return results;
+                results.Sort((a, b) => GetIslandSortKey(adjacency.BodyIndex, a).CompareTo(GetIslandSortKey(adjacency.BodyIndex, b)));
+                return results;
+            }
+            finally
+            {
+                _arena.FreeArray(visited);
+                _arena.FreeArray(inIsland);
+            }
         }
 
         private void BuildIslandFromSeed(
@@ -1285,6 +1479,8 @@ namespace Box2DNG
             {
                 AddJointToConstraintGraph(_awakeSet.Joints[i]);
             }
+
+            ValidateConstraintGraph();
         }
 
         private void AddContactToConstraintGraph(Contact contact)
@@ -3190,6 +3386,30 @@ namespace Box2DNG
             return a.ProxyId.CompareTo(b.ProxyId);
         }
 
+        private int CountFixtures()
+        {
+            int count = 0;
+            for (int i = 0; i < _bodies.Count; ++i)
+            {
+                count += _bodies[i].Fixtures.Count;
+            }
+            return count;
+        }
+
+        private int CountJoints()
+        {
+            return _distanceJoints.Count +
+                   _revoluteJoints.Count +
+                   _prismaticJoints.Count +
+                   _wheelJoints.Count +
+                   _pulleyJoints.Count +
+                   _weldJoints.Count +
+                   _motorJoints.Count +
+                   _gearJoints.Count +
+                   _ropeJoints.Count +
+                   _frictionJoints.Count;
+        }
+
         [System.Diagnostics.Conditional("DEBUG")]
         private void ValidateContacts()
         {
@@ -3219,6 +3439,8 @@ namespace Box2DNG
                     if (contact.SolverSetType == SolverSetType.Sleeping)
                     {
                         System.Diagnostics.Debug.Assert(sleepingTouching.Contains(contact));
+                        System.Diagnostics.Debug.Assert(contact.ColorIndex == -1);
+                        System.Diagnostics.Debug.Assert(contact.LocalIndex == -1);
                     }
                     else
                     {
@@ -3244,6 +3466,8 @@ namespace Box2DNG
                     }
                     System.Diagnostics.Debug.Assert(!awakeTouching.Contains(contact));
                     System.Diagnostics.Debug.Assert(!sleepingTouching.Contains(contact));
+                    System.Diagnostics.Debug.Assert(contact.ColorIndex == -1);
+                    System.Diagnostics.Debug.Assert(contact.LocalIndex == -1);
                 }
             }
         }
@@ -3325,6 +3549,251 @@ namespace Box2DNG
                 JointHandle handle = _sleepingSet.Joints[i];
                 System.Diagnostics.Debug.Assert(_jointSolverSetTypes.TryGetValue(handle, out SolverSetType type) && type == SolverSetType.Sleeping);
             }
+
+            ValidateIdPoolMembership();
+        }
+
+        [System.Diagnostics.Conditional("DEBUG")]
+        private void ValidateIdPoolMembership()
+        {
+            ValidatePool(
+                _bodyIdPool,
+                _bodyIdPool.Capacity,
+                () =>
+                {
+                    bool[] used = new bool[_bodyIdPool.Capacity];
+                    for (int i = 0; i < _bodies.Count; ++i)
+                    {
+                        int id = _bodies[i].Id;
+                        if (id >= 0)
+                        {
+                            System.Diagnostics.Debug.Assert(id < used.Length);
+                            used[id] = true;
+                        }
+                    }
+                    return used;
+                });
+
+            ValidatePool(
+                _fixtureIdPool,
+                _fixtureIdPool.Capacity,
+                () =>
+                {
+                    bool[] used = new bool[_fixtureIdPool.Capacity];
+                    for (int i = 0; i < _bodies.Count; ++i)
+                    {
+                        var fixtures = _bodies[i].Fixtures;
+                        for (int j = 0; j < fixtures.Count; ++j)
+                        {
+                            int id = fixtures[j].Id;
+                            if (id >= 0)
+                            {
+                                System.Diagnostics.Debug.Assert(id < used.Length);
+                                used[id] = true;
+                            }
+                        }
+                    }
+                    return used;
+                });
+
+            ValidatePool(
+                _jointIdPool,
+                _jointIdPool.Capacity,
+                () =>
+                {
+                    bool[] used = new bool[_jointIdPool.Capacity];
+                    MarkJointIds(used, _distanceJoints, static joint => joint.Id);
+                    MarkJointIds(used, _revoluteJoints, static joint => joint.Id);
+                    MarkJointIds(used, _prismaticJoints, static joint => joint.Id);
+                    MarkJointIds(used, _wheelJoints, static joint => joint.Id);
+                    MarkJointIds(used, _pulleyJoints, static joint => joint.Id);
+                    MarkJointIds(used, _weldJoints, static joint => joint.Id);
+                    MarkJointIds(used, _motorJoints, static joint => joint.Id);
+                    MarkJointIds(used, _gearJoints, static joint => joint.Id);
+                    MarkJointIds(used, _ropeJoints, static joint => joint.Id);
+                    MarkJointIds(used, _frictionJoints, static joint => joint.Id);
+                    return used;
+                });
+
+            ValidatePool(
+                _contactIdPool,
+                _contactIdPool.Capacity,
+                () =>
+                {
+                    bool[] used = new bool[_contactIdPool.Capacity];
+                    foreach (var pair in _contactMap)
+                    {
+                        int id = pair.Value.Id;
+                        if (id >= 0)
+                        {
+                            System.Diagnostics.Debug.Assert(id < used.Length);
+                            used[id] = true;
+                        }
+                    }
+                    return used;
+                });
+
+            ValidatePool(
+                _contactEdgeIdPool,
+                _contactEdgeIdPool.Capacity,
+                () =>
+                {
+                    bool[] used = new bool[_contactEdgeIdPool.Capacity];
+                    foreach (var pair in _contactMap)
+                    {
+                        Contact contact = pair.Value;
+                        if (contact.EdgeA != null)
+                        {
+                            int id = contact.EdgeA.Id;
+                            System.Diagnostics.Debug.Assert(0 <= id && id < used.Length);
+                            used[id] = true;
+                        }
+                        if (contact.EdgeB != null)
+                        {
+                            int id = contact.EdgeB.Id;
+                            System.Diagnostics.Debug.Assert(0 <= id && id < used.Length);
+                            used[id] = true;
+                        }
+                    }
+                    return used;
+                });
+
+            ValidatePool(
+                _solverSetIdPool,
+                _solverSetIdPool.Capacity,
+                () =>
+                {
+                    bool[] used = new bool[_solverSetIdPool.Capacity];
+                    used[0] = true;
+                    foreach (var pair in _sleepingIslandSets)
+                    {
+                        int id = pair.Key;
+                        System.Diagnostics.Debug.Assert(0 <= id && id < used.Length);
+                        used[id] = true;
+                    }
+                    return used;
+                });
+        }
+
+        [System.Diagnostics.Conditional("DEBUG")]
+        private void ValidateConstraintGraph()
+        {
+            System.Collections.Generic.Dictionary<int, Body> bodiesById = new System.Collections.Generic.Dictionary<int, Body>(_bodies.Count);
+            for (int i = 0; i < _bodies.Count; ++i)
+            {
+                Body body = _bodies[i];
+                if (body.Id >= 0)
+                {
+                    bodiesById[body.Id] = body;
+                }
+            }
+
+            for (int colorIndex = 0; colorIndex < Constants.GraphColorCount; ++colorIndex)
+            {
+                ConstraintGraph.GraphColor color = _constraintGraph.Colors[colorIndex];
+                System.Collections.Generic.HashSet<int> expectedDynamicBodyIds = new System.Collections.Generic.HashSet<int>();
+
+                for (int i = 0; i < color.Contacts.Count; ++i)
+                {
+                    Contact contact = color.Contacts[i];
+                    System.Diagnostics.Debug.Assert(contact.SolverSetType == SolverSetType.Awake);
+                    System.Diagnostics.Debug.Assert(contact.SolverSetId == 0);
+                    System.Diagnostics.Debug.Assert(contact.ColorIndex == colorIndex);
+                    System.Diagnostics.Debug.Assert(contact.LocalIndex == i);
+                    if (contact.FixtureA != null && contact.FixtureA.Body.Type == BodyType.Dynamic)
+                    {
+                        expectedDynamicBodyIds.Add(contact.FixtureA.Body.Id);
+                    }
+                    if (contact.FixtureB != null && contact.FixtureB.Body.Type == BodyType.Dynamic)
+                    {
+                        expectedDynamicBodyIds.Add(contact.FixtureB.Body.Id);
+                    }
+                }
+
+                for (int i = 0; i < color.Joints.Count; ++i)
+                {
+                    JointHandle handle = color.Joints[i];
+                    System.Diagnostics.Debug.Assert(_jointColorIndices.TryGetValue(handle, out int jointColor));
+                    System.Diagnostics.Debug.Assert(jointColor == colorIndex);
+                    System.Diagnostics.Debug.Assert(_jointLocalIndices.TryGetValue(handle, out int localIndex));
+                    System.Diagnostics.Debug.Assert(localIndex == i);
+                    if (TryGetJointBodies(handle, out Body bodyA, out Body bodyB))
+                    {
+                        if (bodyA.Type == BodyType.Dynamic)
+                        {
+                            expectedDynamicBodyIds.Add(bodyA.Id);
+                        }
+                        if (bodyB.Type == BodyType.Dynamic)
+                        {
+                            expectedDynamicBodyIds.Add(bodyB.Id);
+                        }
+                    }
+                }
+
+                if (colorIndex == Constants.GraphOverflowIndex)
+                {
+                    continue;
+                }
+
+                System.Diagnostics.Debug.Assert(color.BodySet != null);
+                BitSet bodySet = color.BodySet!;
+                foreach (int bodyId in expectedDynamicBodyIds)
+                {
+                    System.Diagnostics.Debug.Assert(bodySet.GetBit((uint)bodyId));
+                }
+
+                int bitCount = bodySet.CountSetBits();
+                System.Diagnostics.Debug.Assert(bitCount == expectedDynamicBodyIds.Count);
+                for (int bodyId = 0; bodyId < _bodyIdPool.Capacity; ++bodyId)
+                {
+                    bool present = bodySet.GetBit((uint)bodyId);
+                    if (!present)
+                    {
+                        continue;
+                    }
+
+                    System.Diagnostics.Debug.Assert(expectedDynamicBodyIds.Contains(bodyId));
+                    System.Diagnostics.Debug.Assert(bodiesById.TryGetValue(bodyId, out Body? body));
+                    System.Diagnostics.Debug.Assert(body.Type == BodyType.Dynamic);
+                }
+            }
+        }
+
+        private static void MarkJointIds<TJoint>(
+            bool[] used,
+            System.Collections.Generic.List<TJoint> joints,
+            System.Func<TJoint, int> getId)
+        {
+            for (int i = 0; i < joints.Count; ++i)
+            {
+                int id = getId(joints[i]);
+                if (id < 0)
+                {
+                    continue;
+                }
+                System.Diagnostics.Debug.Assert(id < used.Length);
+                used[id] = true;
+            }
+        }
+
+        private static void ValidatePool(IdPool pool, int capacity, System.Func<bool[]> buildUsed)
+        {
+            bool[] used = buildUsed();
+            System.Diagnostics.Debug.Assert(used.Length == capacity);
+            int usedCount = 0;
+            for (int i = 0; i < used.Length; ++i)
+            {
+                if (used[i])
+                {
+                    usedCount += 1;
+                    pool.ValidateUsedId(i);
+                }
+                else
+                {
+                    pool.ValidateFreeId(i);
+                }
+            }
+            System.Diagnostics.Debug.Assert(usedCount == pool.Count);
         }
 
         [System.Diagnostics.Conditional("DEBUG")]

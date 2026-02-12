@@ -342,5 +342,80 @@ namespace Box2DNG.Tests
 
             Assert.AreEqual(0, pool.Count);
         }
+
+        [TestMethod]
+        public void WorldAllocationStats_TracksWorldCounts()
+        {
+            World world = new World(new WorldDef().WithGravity(Vec2.Zero).EnableSleeping(false));
+            Body bodyA = world.CreateBody(new BodyDef().AsDynamic().At(0f, 0f));
+            Body bodyB = world.CreateBody(new BodyDef().AsDynamic().At(0.6f, 0f));
+            bodyA.CreateFixture(new FixtureDef(new CircleShape(0.5f)).WithDensity(1f));
+            bodyB.CreateFixture(new FixtureDef(new CircleShape(0.5f)).WithDensity(1f));
+            world.CreateJoint(new DistanceJointDef(bodyA, bodyB, bodyA.GetWorldCenter(), bodyB.GetWorldCenter()));
+
+            world.Step(1f / 60f);
+            World.AllocationStats stats = world.GetAllocationStats();
+
+            Assert.AreEqual(2, stats.BodyCount, "Expected body count to match world.");
+            Assert.AreEqual(2, stats.FixtureCount, "Expected fixture count to match world.");
+            Assert.AreEqual(1, stats.JointCount, "Expected joint count to match world.");
+            Assert.AreEqual(stats.BodyCount, stats.BodyIdCount, "Expected body id pool count parity.");
+            Assert.AreEqual(stats.FixtureCount, stats.FixtureIdCount, "Expected fixture id pool count parity.");
+            Assert.AreEqual(stats.JointCount, stats.JointIdCount, "Expected joint id pool count parity.");
+            Assert.AreEqual(stats.ContactCount, stats.ContactIdCount, "Expected contact id pool count parity.");
+            Assert.IsTrue(stats.AllocatorBytes >= 0, "Expected allocator byte count to be available.");
+        }
+
+        [TestMethod]
+        public void WorldAllocationStats_ReflectsFixtureDestroy()
+        {
+            World world = new World(new WorldDef().WithGravity(Vec2.Zero).EnableSleeping(false));
+            Body body = world.CreateBody(new BodyDef().AsDynamic().At(0f, 0f));
+            Fixture fixture = body.CreateFixture(new FixtureDef(new CircleShape(0.5f)).WithDensity(1f));
+
+            World.AllocationStats before = world.GetAllocationStats();
+            Assert.AreEqual(1, before.FixtureCount);
+            Assert.AreEqual(1, before.FixtureIdCount);
+
+            body.DestroyFixture(fixture);
+            world.UpdateContacts();
+
+            World.AllocationStats after = world.GetAllocationStats();
+            Assert.AreEqual(0, after.FixtureCount);
+            Assert.AreEqual(0, after.FixtureIdCount);
+            Assert.IsTrue(after.FixtureIdCapacity >= before.FixtureIdCapacity, "Expected fixture id capacity to be monotonic.");
+        }
+
+        [TestMethod]
+        public void WorldHandle_CreateValidateDestroy_Works()
+        {
+            WorldId id = Box2D.CreateWorld(new WorldDef().WithGravity(Vec2.Zero));
+            Assert.IsTrue(Box2D.IsValid(id), "Expected created world id to be valid.");
+            Assert.IsTrue(Box2D.TryGetWorld(id, out World? world) && world != null, "Expected lookup of created world.");
+            Assert.AreEqual(id, world!.Id, "Expected world to expose matching world id.");
+
+            bool destroyed = Box2D.DestroyWorld(id);
+            Assert.IsTrue(destroyed, "Expected destroy to succeed.");
+            Assert.IsFalse(Box2D.IsValid(id), "Expected destroyed world id to be invalid.");
+            Assert.IsFalse(Box2D.TryGetWorld(id, out _), "Expected destroyed world lookup to fail.");
+        }
+
+        [TestMethod]
+        public void WorldHandle_Generation_IncrementsAfterDestroy()
+        {
+            WorldId first = Box2D.CreateWorld(new WorldDef().WithGravity(Vec2.Zero));
+            Assert.IsTrue(Box2D.DestroyWorld(first), "Expected first destroy to succeed.");
+
+            WorldId second = Box2D.CreateWorld(new WorldDef().WithGravity(Vec2.Zero));
+            try
+            {
+                Assert.AreEqual(first.Index1, second.Index1, "Expected world slot reuse.");
+                Assert.AreNotEqual(first.Generation, second.Generation, "Expected generation to increment on reuse.");
+            }
+            finally
+            {
+                Box2D.DestroyWorld(second);
+            }
+        }
     }
 }
