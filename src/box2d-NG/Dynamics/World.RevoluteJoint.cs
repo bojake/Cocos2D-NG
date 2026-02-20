@@ -77,6 +77,8 @@ namespace Box2DNG
             Body bodyB = joint.BodyB;
             int jointId = joint.Id;
 
+            DestroyDependentGearJoints(jointId);
+
             int lastIndex = _revoluteJointCount - 1;
             if (index != lastIndex)
             {
