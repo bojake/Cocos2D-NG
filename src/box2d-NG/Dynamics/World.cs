@@ -63,7 +63,6 @@ namespace Box2DNG
         private ContactSolverStats _lastContactSolverStats = new ContactSolverStats();
         private bool _islandsDirty = true;
         private readonly System.Collections.Generic.HashSet<int> _dirtyIslandIds = new System.Collections.Generic.HashSet<int>();
-        private readonly System.Collections.Generic.Dictionary<Body, int> _bodyIslandIds = new System.Collections.Generic.Dictionary<Body, int>();
         private readonly IdPool _islandIdPool = new IdPool();
         private readonly IdPool _bodyIdPool = new IdPool();
         private readonly IdPool _fixtureIdPool = new IdPool();
@@ -114,6 +113,7 @@ namespace Box2DNG
         internal float[] _bodySleepTimes;
         internal SolverSetType[] _bodySolverSetTypes;
         internal int[] _bodyPoolIds;
+        internal int[] _bodyIslandIdsByBody;
 
         private void EnsureBodyCapacity(int capacity)
         {
@@ -144,6 +144,10 @@ namespace Box2DNG
             Array.Resize(ref _bodySleepTimes, newCapacity);
             Array.Resize(ref _bodySolverSetTypes, newCapacity);
             Array.Resize(ref _bodyPoolIds, newCapacity);
+            int previousCapacity = _bodyCapacity;
+            Array.Resize(ref _bodyIslandIdsByBody, newCapacity);
+            Array.Fill(_bodyIslandIdsByBody, -1, previousCapacity, newCapacity - previousCapacity);
+            Array.Resize(ref _bodyJoints, newCapacity);
             _bodyCapacity = newCapacity;
         }
 
@@ -178,6 +182,9 @@ namespace Box2DNG
             _bodySleepTimes = new float[_bodyCapacity];
             _bodySolverSetTypes = new SolverSetType[_bodyCapacity];
             _bodyPoolIds = new int[_bodyCapacity];
+            _bodyIslandIdsByBody = new int[_bodyCapacity];
+            Array.Fill(_bodyIslandIdsByBody, -1);
+            _bodyJoints = new System.Collections.Generic.List<JointHandle>[_bodyCapacity];
             
             _distanceJointCapacity = 256;
             _distanceJoints = new DistanceJoint[_distanceJointCapacity];
@@ -435,11 +442,28 @@ namespace Box2DNG
         }
         public int? GetIslandId(Body body)
         {
-            if (_bodyIslandIds.TryGetValue(body, out int id))
+            if (TryGetBodyIslandId(body, out int id))
             {
                 return id;
             }
             return null;
+        }
+
+        private bool TryGetBodyIslandId(Body body, out int islandId)
+        {
+            int bodyId = body.Id;
+            if ((uint)bodyId < (uint)_bodyCount)
+            {
+                int mappedId = _bodyIslandIdsByBody[bodyId];
+                if (mappedId >= 0)
+                {
+                    islandId = mappedId;
+                    return true;
+                }
+            }
+
+            islandId = -1;
+            return false;
         }
 
         private System.Collections.Generic.List<Island> _lastIslands = new System.Collections.Generic.List<Island>();
@@ -449,8 +473,7 @@ namespace Box2DNG
         private readonly SolverSet _sleepingSet = new SolverSet();
         private readonly System.Collections.Generic.Dictionary<Body, System.Collections.Generic.List<Contact>> _bodyContacts =
             new System.Collections.Generic.Dictionary<Body, System.Collections.Generic.List<Contact>>();
-        private readonly System.Collections.Generic.Dictionary<Body, System.Collections.Generic.List<JointHandle>> _bodyJoints =
-            new System.Collections.Generic.Dictionary<Body, System.Collections.Generic.List<JointHandle>>();
+        private System.Collections.Generic.List<JointHandle>[] _bodyJoints = System.Array.Empty<System.Collections.Generic.List<JointHandle>>();
         private readonly System.Collections.Generic.Dictionary<int, SolverSet> _sleepingIslandSets =
             new System.Collections.Generic.Dictionary<int, SolverSet>();
         private readonly System.Collections.Generic.Dictionary<int, int> _sleepingSetIdByIslandId =
@@ -495,7 +518,8 @@ namespace Box2DNG
             if (body.Id == -1) return; // Already destroyed
             int removedPoolId = _bodyPoolIds[body.Id];
 
-            if (_bodyJoints.TryGetValue(body, out System.Collections.Generic.List<JointHandle>? joints) && joints.Count > 0)
+            System.Collections.Generic.List<JointHandle>? joints = _bodyJoints[body.Id];
+            if (joints != null && joints.Count > 0)
             {
                 System.Collections.Generic.List<JointHandle> toDestroy = new System.Collections.Generic.List<JointHandle>(joints);
                 for (int i = toDestroy.Count - 1; i >= 0; --i)
@@ -577,6 +601,8 @@ namespace Box2DNG
                 _bodySleepTimes[idToRemove] = _bodySleepTimes[lastId];
                 _bodySolverSetTypes[idToRemove] = _bodySolverSetTypes[lastId];
                 _bodyPoolIds[idToRemove] = _bodyPoolIds[lastId];
+                _bodyIslandIdsByBody[idToRemove] = _bodyIslandIdsByBody[lastId];
+                _bodyJoints[idToRemove] = _bodyJoints[lastId];
 
                 // Move the Body wrapper in the list
                 Body lastBody = _bodies[lastId];
@@ -589,11 +615,16 @@ namespace Box2DNG
             // Remove the last element
             _bodies.RemoveAt(lastId);
             _bodyCount--;
+            _bodyIslandIdsByBody[lastId] = -1;
+            _bodyJoints[lastId] = null!;
             
             // Clean up other references
             _bodyContacts.Remove(body);
-            _bodyJoints.Remove(body);
-            _bodyIslandIds.Remove(body);
+            _bodyJoints[idToRemove] = null!;
+            if (idToRemove == lastId && (uint)idToRemove < (uint)_bodyIslandIdsByBody.Length)
+            {
+                _bodyIslandIdsByBody[idToRemove] = -1;
+            }
             _staticSet.Bodies.Remove(body);
             _awakeSet.Bodies.Remove(body);
             _sleepingSet.Bodies.Remove(body);
@@ -1492,7 +1523,7 @@ namespace Box2DNG
                     _awakeSet.Bodies.Add(body);
                 }
 
-                if (_bodyIslandIds.TryGetValue(body, out int islandId) && islandId >= 0 && islandId < _lastIslands.Count)
+                if (TryGetBodyIslandId(body, out int islandId) && islandId >= 0 && islandId < _lastIslands.Count)
                 {
                     Island island = _lastIslands[islandId];
                     if (!island.IsAwake)
@@ -1535,7 +1566,7 @@ namespace Box2DNG
                     _sleepingSet.Bodies.Add(body);
                 }
 
-                if (_bodyIslandIds.TryGetValue(body, out int islandId) && islandId >= 0 && islandId < _lastIslands.Count)
+                if (TryGetBodyIslandId(body, out int islandId) && islandId >= 0 && islandId < _lastIslands.Count)
                 {
                     Island island = _lastIslands[islandId];
                     if (island.IsAwake)
@@ -1567,7 +1598,7 @@ namespace Box2DNG
 
         private void MarkIslandDirty(Body body)
         {
-            if (_bodyIslandIds.TryGetValue(body, out int islandId))
+            if (TryGetBodyIslandId(body, out int islandId))
             {
                 _dirtyIslandIds.Add(islandId);
             }
@@ -1636,7 +1667,10 @@ namespace Box2DNG
                 EnsureBodyAdjacency(body);
                 bodyContacts[i] = new System.Collections.Generic.List<Contact>(_bodyContacts[body]);
                 bodyContacts[i].Sort(CompareContacts);
-                bodyJoints[i] = new System.Collections.Generic.List<JointHandle>(_bodyJoints[body]);
+                System.Collections.Generic.List<JointHandle>? joints = _bodyJoints[body.Id];
+                bodyJoints[i] = joints != null
+                    ? new System.Collections.Generic.List<JointHandle>(joints)
+                    : new System.Collections.Generic.List<JointHandle>();
                 bodyJoints[i].Sort(CompareJointHandles);
             }
 
@@ -2364,8 +2398,8 @@ namespace Box2DNG
                     {
                         continue;
                     }
-                    if (_bodyIslandIds.TryGetValue(contact.FixtureA!.Body, out int idA) &&
-                        _bodyIslandIds.TryGetValue(contact.FixtureB!.Body, out int idB) &&
+                    if (TryGetBodyIslandId(contact.FixtureA!.Body, out int idA) &&
+                        TryGetBodyIslandId(contact.FixtureB!.Body, out int idB) &&
                         idA == idB && idA >= 0 && idA < _lastIslands.Count &&
                         _lastIslands[idA].IsAwake)
                     {
@@ -2597,9 +2631,9 @@ namespace Box2DNG
             {
                 _bodyContacts[body] = new System.Collections.Generic.List<Contact>();
             }
-            if (!_bodyJoints.ContainsKey(body))
+            if (_bodyJoints[body.Id] == null)
             {
-                _bodyJoints[body] = new System.Collections.Generic.List<JointHandle>();
+                _bodyJoints[body.Id] = new System.Collections.Generic.List<JointHandle>();
             }
         }
 
@@ -2735,13 +2769,19 @@ namespace Box2DNG
         private void LinkJoint(JointHandle handle, Body bodyA, Body bodyB)
         {
             LinkJointToBody(handle, bodyA);
-            LinkJointToBody(handle, bodyB);
+            if (!ReferenceEquals(bodyA, bodyB))
+            {
+                LinkJointToBody(handle, bodyB);
+            }
         }
 
         private void UnlinkJoint(JointHandle handle, Body bodyA, Body bodyB)
         {
             UnlinkJointFromBody(handle, bodyA);
-            UnlinkJointFromBody(handle, bodyB);
+            if (!ReferenceEquals(bodyA, bodyB))
+            {
+                UnlinkJointFromBody(handle, bodyB);
+            }
 
             IncrementConstraintRemoveCount(bodyA, bodyB);
             MarkIslandDirty(bodyA);
@@ -2751,7 +2791,7 @@ namespace Box2DNG
         private void LinkJointToBody(JointHandle handle, Body body)
         {
             EnsureBodyAdjacency(body);
-            System.Collections.Generic.List<JointHandle> list = _bodyJoints[body];
+            System.Collections.Generic.List<JointHandle> list = _bodyJoints[body.Id];
             if (!list.Contains(handle))
             {
                 list.Add(handle);
@@ -2760,7 +2800,8 @@ namespace Box2DNG
 
         private void UnlinkJointFromBody(JointHandle handle, Body body)
         {
-            if (_bodyJoints.TryGetValue(body, out System.Collections.Generic.List<JointHandle>? list))
+            System.Collections.Generic.List<JointHandle>? list = _bodyJoints[body.Id];
+            if (list != null)
             {
                 list.Remove(handle);
             }
@@ -2886,7 +2927,7 @@ namespace Box2DNG
                 return;
             }
 
-            if (_bodyIslandIds.TryGetValue(candidate, out int islandIndex) &&
+            if (TryGetBodyIslandId(candidate, out int islandIndex) &&
                 islandIndex >= 0 &&
                 islandIndex < _lastIslands.Count)
             {
@@ -2920,8 +2961,8 @@ namespace Box2DNG
                 return 0;
             }
 
-            if (!_bodyIslandIds.TryGetValue(bodyA, out int islandId) &&
-                !_bodyIslandIds.TryGetValue(bodyB, out islandId))
+            if (!TryGetBodyIslandId(bodyA, out int islandId) &&
+                !TryGetBodyIslandId(bodyB, out islandId))
             {
                 return 0;
             }
@@ -2945,8 +2986,8 @@ namespace Box2DNG
             {
                 return;
             }
-            if (!_bodyIslandIds.TryGetValue(bodyA, out int islandId) &&
-                !_bodyIslandIds.TryGetValue(bodyB, out islandId))
+            if (!TryGetBodyIslandId(bodyA, out int islandId) &&
+                !TryGetBodyIslandId(bodyB, out islandId))
             {
                 return;
             }
@@ -2978,8 +3019,8 @@ namespace Box2DNG
             {
                 return;
             }
-            if (!_bodyIslandIds.TryGetValue(bodyA, out int islandId) &&
-                !_bodyIslandIds.TryGetValue(bodyB, out islandId))
+            if (!TryGetBodyIslandId(bodyA, out int islandId) &&
+                !TryGetBodyIslandId(bodyB, out islandId))
             {
                 return;
             }
@@ -3078,8 +3119,8 @@ namespace Box2DNG
         {
             BuildIslands(awakeOnly: false);
 
-            if (!_bodyIslandIds.TryGetValue(bodyA, out int islandAId) ||
-                !_bodyIslandIds.TryGetValue(bodyB, out int islandBId) ||
+            if (!TryGetBodyIslandId(bodyA, out int islandAId) ||
+                !TryGetBodyIslandId(bodyB, out int islandBId) ||
                 islandAId == islandBId ||
                 islandAId < 0 || islandBId < 0 ||
                 islandAId >= _lastIslands.Count || islandBId >= _lastIslands.Count)
@@ -3181,13 +3222,13 @@ namespace Box2DNG
 
         private void RebuildIslandIds()
         {
-            _bodyIslandIds.Clear();
+            Array.Fill(_bodyIslandIdsByBody, -1, 0, _bodyCount);
             for (int i = 0; i < _lastIslands.Count; ++i)
             {
                 Island island = _lastIslands[i];
                 for (int j = 0; j < island.Bodies.Count; ++j)
                 {
-                    _bodyIslandIds[island.Bodies[j]] = i;
+                    _bodyIslandIdsByBody[island.Bodies[j].Id] = i;
                 }
             }
         }
@@ -3344,7 +3385,15 @@ namespace Box2DNG
 
         private void RemoveJointFromSleepingSets(JointHandle handle)
         {
-            foreach (var pair in _sleepingIslandSets)
+            if (_jointSolverSetIds.TryGetValue(handle, out int setId) &&
+                setId != 0 &&
+                _sleepingIslandSets.TryGetValue(setId, out SolverSet? set))
+            {
+                set.Joints.Remove(handle);
+                return;
+            }
+
+            foreach (System.Collections.Generic.KeyValuePair<int, SolverSet> pair in _sleepingIslandSets)
             {
                 pair.Value.Joints.Remove(handle);
             }
@@ -3357,7 +3406,14 @@ namespace Box2DNG
 
         private void RemoveContactFromSleepingSets(Contact contact)
         {
-            foreach (var pair in _sleepingIslandSets)
+            int setId = contact.SolverSetId;
+            if (setId != 0 && _sleepingIslandSets.TryGetValue(setId, out SolverSet? set))
+            {
+                set.Contacts.Remove(contact);
+                return;
+            }
+
+            foreach (System.Collections.Generic.KeyValuePair<int, SolverSet> pair in _sleepingIslandSets)
             {
                 pair.Value.Contacts.Remove(contact);
             }
@@ -4025,8 +4081,8 @@ namespace Box2DNG
                         bool validSleeping = false;
                         int sleepingSetId = 0;
                         if (setType == SolverSetType.Sleeping &&
-                            _bodyIslandIds.TryGetValue(fixtureA.Body, out int islandId) &&
-                            _bodyIslandIds.TryGetValue(fixtureB.Body, out int islandIdB) &&
+                            TryGetBodyIslandId(fixtureA.Body, out int islandId) &&
+                            TryGetBodyIslandId(fixtureB.Body, out int islandIdB) &&
                             islandId == islandIdB &&
                             islandId >= 0 && islandId < _lastIslands.Count &&
                             !_lastIslands[islandId].IsAwake)
@@ -4165,8 +4221,8 @@ namespace Box2DNG
                 {
                     bool validSleeping = contact.SolverSetId != 0;
                     if (!validSleeping &&
-                        _bodyIslandIds.TryGetValue(contact.FixtureA!.Body, out int islandId) &&
-                        _bodyIslandIds.TryGetValue(contact.FixtureB!.Body, out int islandIdB) &&
+                        TryGetBodyIslandId(contact.FixtureA!.Body, out int islandId) &&
+                        TryGetBodyIslandId(contact.FixtureB!.Body, out int islandIdB) &&
                         islandId == islandIdB &&
                         islandId >= 0 && islandId < _lastIslands.Count &&
                         !_lastIslands[islandId].IsAwake)
@@ -4877,7 +4933,7 @@ namespace Box2DNG
                         System.Diagnostics.Debug.Assert(_sleepingSet.Islands.Contains(island));
                     }
 
-                    if (_bodyIslandIds.TryGetValue(body, out int islandId))
+                    if (TryGetBodyIslandId(body, out int islandId))
                     {
                         System.Diagnostics.Debug.Assert(islandId == i);
                     }
@@ -6102,7 +6158,8 @@ namespace Box2DNG
 
         private bool IsCollisionDisabledByJoint(Body bodyA, Body bodyB)
         {
-            if (!_bodyJoints.TryGetValue(bodyA, out System.Collections.Generic.List<JointHandle>? joints))
+            System.Collections.Generic.List<JointHandle>? joints = _bodyJoints[bodyA.Id];
+            if (joints == null)
             {
                 return false;
             }

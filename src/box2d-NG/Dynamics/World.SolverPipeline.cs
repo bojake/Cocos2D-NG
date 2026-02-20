@@ -133,14 +133,6 @@ namespace Box2DNG
                     for (int i = 0; i < joints.Count; ++i)
                     {
                         JointHandle handle = joints[i];
-                        if (_world.TryGetJointSolverSetType(handle, out SolverSetType setType) && setType != SolverSetType.Awake)
-                        {
-                            continue;
-                        }
-                        if (_world.TryGetJointSolverSetId(handle, out int setId) && setId != 0)
-                        {
-                            continue;
-                        }
                         InitJointVelocityConstraints(handle, timeStep);
                     }
                 }
@@ -162,14 +154,6 @@ namespace Box2DNG
                         for (int i = 0; i < joints.Count; ++i)
                         {
                             JointHandle handle = joints[i];
-                            if (_world.TryGetJointSolverSetType(handle, out SolverSetType setType) && setType != SolverSetType.Awake)
-                            {
-                                continue;
-                            }
-                            if (_world.TryGetJointSolverSetId(handle, out int setId) && setId != 0)
-                            {
-                                continue;
-                            }
                             SolveJointVelocityConstraints(handle, timeStep);
                         }
                     }
@@ -265,14 +249,6 @@ namespace Box2DNG
                         for (int i = 0; i < joints.Count; ++i)
                         {
                             JointHandle handle = joints[i];
-                            if (_world.TryGetJointSolverSetType(handle, out SolverSetType setType) && setType != SolverSetType.Awake)
-                            {
-                                continue;
-                            }
-                            if (_world.TryGetJointSolverSetId(handle, out int setId) && setId != 0)
-                            {
-                                continue;
-                            }
                             SolveJointPositionConstraints(handle);
                         }
                     }
