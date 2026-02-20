@@ -52,11 +52,10 @@ namespace Box2DNG
             
             JointHandle handle = new JointHandle(JointType.Revolute, id);
             LinkJoint(handle, def.BodyA, def.BodyB); // Use def.BodyA which are Objects
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(def.BodyA, def.BodyB);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(def.BodyA, def.BodyB);
+            SetJointSolverSet(handle, GetJointSolverSetType(def.BodyA, def.BodyB), GetJointSolverSetId(def.BodyA, def.BodyB));
             TryAddJointToSleepingSet(handle, def.BodyA, def.BodyB);
 
-            if (_jointSolverSetTypes[handle] == SolverSetType.Awake)
+            if (TryGetJointSolverSetType(handle, out SolverSetType solverSetType) && solverSetType == SolverSetType.Awake)
             {
                 _awakeSet.Joints.Add(handle);
             }
@@ -106,10 +105,8 @@ namespace Box2DNG
             
             JointHandle handle = new JointHandle(JointType.Revolute, jointId);
             UnlinkJoint(handle, bodyA, bodyB);
-            _jointSolverSetTypes.Remove(handle);
-            _jointSolverSetIds.Remove(handle);
-            _jointColorIndices.Remove(handle);
-            _jointLocalIndices.Remove(handle);
+            ClearJointSolverSet(handle);
+            ClearJointConstraintGraphIndex(handle);
             MarkIslandDirty(bodyA);
             MarkIslandDirty(bodyB);
             
@@ -338,3 +335,4 @@ namespace Box2DNG
         }
     }
 }
+

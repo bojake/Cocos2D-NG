@@ -74,10 +74,9 @@ namespace Box2DNG
         private readonly ArenaAllocator _arena;
         private bool _disposed;
         private WorldId _worldId;
-        private readonly System.Collections.Generic.Dictionary<JointHandle, int> _jointColorIndices =
-            new System.Collections.Generic.Dictionary<JointHandle, int>();
-        private readonly System.Collections.Generic.Dictionary<JointHandle, int> _jointLocalIndices =
-            new System.Collections.Generic.Dictionary<JointHandle, int>();
+        private int[] _jointColorIndicesById = System.Array.Empty<int>();
+        private int[] _jointLocalIndicesById = System.Array.Empty<int>();
+        private bool[] _jointConstraintGraphUsedById = System.Array.Empty<bool>();
 
         // DoD Storage
         internal int _bodyCapacity;
@@ -225,6 +224,16 @@ namespace Box2DNG
             _frictionJointCapacity = 256;
             _frictionJoints = new FrictionJoint[_frictionJointCapacity];
             _frictionJointsData = new FrictionJointData[_frictionJointCapacity];
+
+            int jointMetaCapacity = Math.Max(256, _jointIdPool.Capacity);
+            _jointSolverSetTypesById = new SolverSetType[jointMetaCapacity];
+            _jointSolverSetIdsById = new int[jointMetaCapacity];
+            _jointSolverSetUsedById = new bool[jointMetaCapacity];
+            _jointColorIndicesById = new int[jointMetaCapacity];
+            _jointLocalIndicesById = new int[jointMetaCapacity];
+            _jointConstraintGraphUsedById = new bool[jointMetaCapacity];
+            Array.Fill(_jointColorIndicesById, -1);
+            Array.Fill(_jointLocalIndicesById, -1);
         }
 
         public readonly struct ContactSolverStats
@@ -478,10 +487,9 @@ namespace Box2DNG
             new System.Collections.Generic.Dictionary<int, SolverSet>();
         private readonly System.Collections.Generic.Dictionary<int, int> _sleepingSetIdByIslandId =
             new System.Collections.Generic.Dictionary<int, int>();
-        private readonly System.Collections.Generic.Dictionary<JointHandle, SolverSetType> _jointSolverSetTypes =
-            new System.Collections.Generic.Dictionary<JointHandle, SolverSetType>();
-        private readonly System.Collections.Generic.Dictionary<JointHandle, int> _jointSolverSetIds =
-            new System.Collections.Generic.Dictionary<JointHandle, int>();
+        private SolverSetType[] _jointSolverSetTypesById = System.Array.Empty<SolverSetType>();
+        private int[] _jointSolverSetIdsById = System.Array.Empty<int>();
+        private bool[] _jointSolverSetUsedById = System.Array.Empty<bool>();
         private float _stepContactHertz;
 
         internal Body GetBody(int index)
@@ -736,8 +744,7 @@ namespace Box2DNG
             _distanceJointIndexById[joint.Id] = index;
             JointHandle handle = new JointHandle(JointType.Distance, joint.Id);
             LinkJoint(handle, joint.BodyA, joint.BodyB);
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(joint.BodyA, joint.BodyB);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(joint.BodyA, joint.BodyB);
+                        SetJointSolverSet(handle, GetJointSolverSetType(joint.BodyA, joint.BodyB), GetJointSolverSetId(joint.BodyA, joint.BodyB));
             TryAddJointToSleepingSet(handle, joint.BodyA, joint.BodyB);
             MarkIslandDirty(joint.BodyA);
             MarkIslandDirty(joint.BodyB);
@@ -754,8 +761,7 @@ namespace Box2DNG
             _revoluteJointIndexById[joint.Id] = _revoluteJoints.Count - 1;
             JointHandle handle = new JointHandle(JointType.Revolute, joint.Id);
             LinkJoint(handle, joint.BodyA, joint.BodyB);
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(joint.BodyA, joint.BodyB);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(joint.BodyA, joint.BodyB);
+                        SetJointSolverSet(handle, GetJointSolverSetType(joint.BodyA, joint.BodyB), GetJointSolverSetId(joint.BodyA, joint.BodyB));
             TryAddJointToSleepingSet(handle, joint.BodyA, joint.BodyB);
             MarkIslandDirty(joint.BodyA);
             MarkIslandDirty(joint.BodyB);
@@ -773,8 +779,7 @@ namespace Box2DNG
             _prismaticJointIndexById[joint.Id] = _prismaticJoints.Count - 1;
             JointHandle handle = new JointHandle(JointType.Prismatic, joint.Id);
             LinkJoint(handle, joint.BodyA, joint.BodyB);
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(joint.BodyA, joint.BodyB);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(joint.BodyA, joint.BodyB);
+                        SetJointSolverSet(handle, GetJointSolverSetType(joint.BodyA, joint.BodyB), GetJointSolverSetId(joint.BodyA, joint.BodyB));
             TryAddJointToSleepingSet(handle, joint.BodyA, joint.BodyB);
             MarkIslandDirty(joint.BodyA);
             MarkIslandDirty(joint.BodyB);
@@ -820,8 +825,7 @@ namespace Box2DNG
             _wheelJointIndexById[id] = index;
             JointHandle handle = new JointHandle(JointType.Wheel, id);
             LinkJoint(handle, def.BodyA, def.BodyB);
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(def.BodyA, def.BodyB);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(def.BodyA, def.BodyB);
+                        SetJointSolverSet(handle, GetJointSolverSetType(def.BodyA, def.BodyB), GetJointSolverSetId(def.BodyA, def.BodyB));
             TryAddJointToSleepingSet(handle, def.BodyA, def.BodyB);
             MarkIslandDirty(def.BodyA);
             MarkIslandDirty(def.BodyB);
@@ -862,8 +866,7 @@ namespace Box2DNG
             _pulleyJointIndexById[id] = index;
             JointHandle handle = new JointHandle(JointType.Pulley, id);
             LinkJoint(handle, def.BodyA, def.BodyB);
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(def.BodyA, def.BodyB);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(def.BodyA, def.BodyB);
+                        SetJointSolverSet(handle, GetJointSolverSetType(def.BodyA, def.BodyB), GetJointSolverSetId(def.BodyA, def.BodyB));
             TryAddJointToSleepingSet(handle, def.BodyA, def.BodyB);
             MarkIslandDirty(def.BodyA);
             MarkIslandDirty(def.BodyB);
@@ -900,8 +903,7 @@ namespace Box2DNG
             _weldJointIndexById[id] = index;
             JointHandle handle = new JointHandle(JointType.Weld, id);
             LinkJoint(handle, def.BodyA, def.BodyB);
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(def.BodyA, def.BodyB);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(def.BodyA, def.BodyB);
+                        SetJointSolverSet(handle, GetJointSolverSetType(def.BodyA, def.BodyB), GetJointSolverSetId(def.BodyA, def.BodyB));
             TryAddJointToSleepingSet(handle, def.BodyA, def.BodyB);
             MarkIslandDirty(def.BodyA);
             MarkIslandDirty(def.BodyB);
@@ -940,8 +942,7 @@ namespace Box2DNG
             _motorJointIndexById[id] = index;
             JointHandle handle = new JointHandle(JointType.Motor, id);
             LinkJoint(handle, def.BodyA, def.BodyB);
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(def.BodyA, def.BodyB);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(def.BodyA, def.BodyB);
+                        SetJointSolverSet(handle, GetJointSolverSetType(def.BodyA, def.BodyB), GetJointSolverSetId(def.BodyA, def.BodyB));
             TryAddJointToSleepingSet(handle, def.BodyA, def.BodyB);
             MarkIslandDirty(def.BodyA);
             MarkIslandDirty(def.BodyB);
@@ -1042,8 +1043,7 @@ namespace Box2DNG
             LinkJoint(handle, bodyAObj, bodyBObj);
             LinkJointToBody(handle, bodyCObj);
             LinkJointToBody(handle, bodyDObj);
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(bodyBObj, bodyDObj);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(bodyBObj, bodyDObj);
+                        SetJointSolverSet(handle, GetJointSolverSetType(bodyBObj, bodyDObj), GetJointSolverSetId(bodyBObj, bodyDObj));
             TryAddJointToSleepingSet(handle, bodyBObj, bodyDObj);
             MarkIslandDirty(bodyAObj);
             MarkIslandDirty(bodyBObj);
@@ -1083,8 +1083,7 @@ namespace Box2DNG
             _ropeJointIndexById[id] = index;
             JointHandle handle = new JointHandle(JointType.Rope, id);
             LinkJoint(handle, def.BodyA, def.BodyB);
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(def.BodyA, def.BodyB);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(def.BodyA, def.BodyB);
+                        SetJointSolverSet(handle, GetJointSolverSetType(def.BodyA, def.BodyB), GetJointSolverSetId(def.BodyA, def.BodyB));
             TryAddJointToSleepingSet(handle, def.BodyA, def.BodyB);
             MarkIslandDirty(def.BodyA);
             MarkIslandDirty(def.BodyB);
@@ -1122,8 +1121,7 @@ namespace Box2DNG
             _frictionJointIndexById[id] = index;
             JointHandle handle = new JointHandle(JointType.Friction, id);
             LinkJoint(handle, def.BodyA, def.BodyB);
-            _jointSolverSetTypes[handle] = GetJointSolverSetType(def.BodyA, def.BodyB);
-            _jointSolverSetIds[handle] = GetJointSolverSetId(def.BodyA, def.BodyB);
+                        SetJointSolverSet(handle, GetJointSolverSetType(def.BodyA, def.BodyB), GetJointSolverSetId(def.BodyA, def.BodyB));
             TryAddJointToSleepingSet(handle, def.BodyA, def.BodyB);
             MarkIslandDirty(def.BodyA);
             MarkIslandDirty(def.BodyB);
@@ -1160,8 +1158,8 @@ namespace Box2DNG
              Body bodyB = joint.BodyB;
              JointHandle handle = new JointHandle(JointType.Distance, jointId);
              UnlinkJoint(handle, bodyA, bodyB);
-             _jointSolverSetTypes.Remove(handle);
-             _jointSolverSetIds.Remove(handle);
+             ClearJointSolverSet(handle);
+             
              MarkIslandDirty(bodyA);
              MarkIslandDirty(bodyB);
              
@@ -1203,10 +1201,9 @@ namespace Box2DNG
 
             JointHandle handle = new JointHandle(JointType.Wheel, jointId);
             UnlinkJoint(handle, bodyA, bodyB);
-            _jointSolverSetTypes.Remove(handle);
-            _jointSolverSetIds.Remove(handle);
-            _jointColorIndices.Remove(handle);
-            _jointLocalIndices.Remove(handle);
+            ClearJointSolverSet(handle);
+            
+            ClearJointConstraintGraphIndex(handle);
             MarkIslandDirty(bodyA);
             MarkIslandDirty(bodyB);
             RemoveJointFromSolverSets(JointType.Wheel, jointId);
@@ -1242,10 +1239,9 @@ namespace Box2DNG
 
             JointHandle handle = new JointHandle(JointType.Pulley, jointId);
             UnlinkJoint(handle, bodyA, bodyB);
-            _jointSolverSetTypes.Remove(handle);
-            _jointSolverSetIds.Remove(handle);
-            _jointColorIndices.Remove(handle);
-            _jointLocalIndices.Remove(handle);
+            ClearJointSolverSet(handle);
+            
+            ClearJointConstraintGraphIndex(handle);
             MarkIslandDirty(bodyA);
             MarkIslandDirty(bodyB);
             RemoveJointFromSolverSets(JointType.Pulley, jointId);
@@ -1281,10 +1277,9 @@ namespace Box2DNG
 
             JointHandle handle = new JointHandle(JointType.Weld, jointId);
             UnlinkJoint(handle, bodyA, bodyB);
-            _jointSolverSetTypes.Remove(handle);
-            _jointSolverSetIds.Remove(handle);
-            _jointColorIndices.Remove(handle);
-            _jointLocalIndices.Remove(handle);
+            ClearJointSolverSet(handle);
+            
+            ClearJointConstraintGraphIndex(handle);
             MarkIslandDirty(bodyA);
             MarkIslandDirty(bodyB);
             RemoveJointFromSolverSets(JointType.Weld, jointId);
@@ -1320,10 +1315,9 @@ namespace Box2DNG
 
             JointHandle handle = new JointHandle(JointType.Motor, jointId);
             UnlinkJoint(handle, bodyA, bodyB);
-            _jointSolverSetTypes.Remove(handle);
-            _jointSolverSetIds.Remove(handle);
-            _jointColorIndices.Remove(handle);
-            _jointLocalIndices.Remove(handle);
+            ClearJointSolverSet(handle);
+            
+            ClearJointConstraintGraphIndex(handle);
             MarkIslandDirty(bodyA);
             MarkIslandDirty(bodyB);
             RemoveJointFromSolverSets(JointType.Motor, jointId);
@@ -1363,10 +1357,9 @@ namespace Box2DNG
             UnlinkJoint(handle, bodyA, bodyB);
             UnlinkJointFromBody(handle, bodyC);
             UnlinkJointFromBody(handle, bodyD);
-            _jointSolverSetTypes.Remove(handle);
-            _jointSolverSetIds.Remove(handle);
-            _jointColorIndices.Remove(handle);
-            _jointLocalIndices.Remove(handle);
+            ClearJointSolverSet(handle);
+            
+            ClearJointConstraintGraphIndex(handle);
             MarkIslandDirty(bodyA);
             MarkIslandDirty(bodyB);
             MarkIslandDirty(bodyC);
@@ -1404,10 +1397,9 @@ namespace Box2DNG
 
             JointHandle handle = new JointHandle(JointType.Rope, jointId);
             UnlinkJoint(handle, bodyA, bodyB);
-            _jointSolverSetTypes.Remove(handle);
-            _jointSolverSetIds.Remove(handle);
-            _jointColorIndices.Remove(handle);
-            _jointLocalIndices.Remove(handle);
+            ClearJointSolverSet(handle);
+            
+            ClearJointConstraintGraphIndex(handle);
             MarkIslandDirty(bodyA);
             MarkIslandDirty(bodyB);
             RemoveJointFromSolverSets(JointType.Rope, jointId);
@@ -1443,10 +1435,9 @@ namespace Box2DNG
 
             JointHandle handle = new JointHandle(JointType.Friction, jointId);
             UnlinkJoint(handle, bodyA, bodyB);
-            _jointSolverSetTypes.Remove(handle);
-            _jointSolverSetIds.Remove(handle);
-            _jointColorIndices.Remove(handle);
-            _jointLocalIndices.Remove(handle);
+            ClearJointSolverSet(handle);
+            
+            ClearJointConstraintGraphIndex(handle);
             MarkIslandDirty(bodyA);
             MarkIslandDirty(bodyB);
             RemoveJointFromSolverSets(JointType.Friction, jointId);
@@ -1485,8 +1476,8 @@ namespace Box2DNG
                 Body bodyB = GetJointBodyB(joint);
                 JointHandle handle = new JointHandle(GetJointType(joint), jointId);
                 UnlinkJoint(handle, bodyA, bodyB);
-                _jointSolverSetTypes.Remove(handle);
-                _jointSolverSetIds.Remove(handle);
+                ClearJointSolverSet(handle);
+                
                 MarkIslandDirty(bodyA);
                 MarkIslandDirty(bodyB);
                 if (index >= 0)
@@ -2289,8 +2280,8 @@ namespace Box2DNG
             _sleepingSet.Joints.Clear();
             _sleepingIslandSets.Clear();
             _sleepingSetIdByIslandId.Clear();
-            _jointSolverSetTypes.Clear();
-            _jointSolverSetIds.Clear();
+            ClearJointSolverSets();
+            
             _solverSetIdPool.Reset();
             int sleepingSetBaseId = _solverSetIdPool.Alloc();
             System.Diagnostics.Debug.Assert(sleepingSetBaseId == 0);
@@ -2340,8 +2331,7 @@ namespace Box2DNG
                 }
                 for (int j = 0; j < island.Joints.Count; ++j)
                 {
-                    _jointSolverSetTypes[island.Joints[j]] = SolverSetType.Awake;
-                    _jointSolverSetIds[island.Joints[j]] = 0;
+                                        SetJointSolverSet(island.Joints[j], SolverSetType.Awake, 0);
                 }
             }
 
@@ -2356,8 +2346,7 @@ namespace Box2DNG
                 }
                 for (int j = 0; j < island.Joints.Count; ++j)
                 {
-                    _jointSolverSetTypes[island.Joints[j]] = SolverSetType.Sleeping;
-                    _jointSolverSetIds[island.Joints[j]] = setId;
+                                        SetJointSolverSet(island.Joints[j], SolverSetType.Sleeping, setId);
                 }
             }
 
@@ -2372,15 +2361,14 @@ namespace Box2DNG
             }
             for (int i = 0; i < _awakeSet.Joints.Count; ++i)
             {
-                _jointSolverSetTypes[_awakeSet.Joints[i]] = SolverSetType.Awake;
-                _jointSolverSetIds[_awakeSet.Joints[i]] = 0;
+                                SetJointSolverSet(_awakeSet.Joints[i], SolverSetType.Awake, 0);
             }
             for (int i = 0; i < _sleepingSet.Joints.Count; ++i)
             {
                 JointHandle handle = _sleepingSet.Joints[i];
-                if (!_jointSolverSetTypes.ContainsKey(handle))
+                if (!TryGetJointSolverSetType(handle, out _))
                 {
-                    _jointSolverSetTypes[handle] = SolverSetType.Sleeping;
+                    SetJointSolverSet(handle, SolverSetType.Sleeping, FindSleepingSetIdForJoint(handle));
                 }
             }
 
@@ -2438,8 +2426,7 @@ namespace Box2DNG
         {
             uint bodyCapacity = (uint)Math.Max(_bodyIdPool.Capacity, 8);
             _constraintGraph.Reset(bodyCapacity);
-            _jointColorIndices.Clear();
-            _jointLocalIndices.Clear();
+            ClearJointConstraintGraphIndices();
 
             for (int i = 0; i < _awakeSet.Contacts.Count; ++i)
             {
@@ -2498,15 +2485,13 @@ namespace Box2DNG
 
             if (bodyA.Type == BodyType.Static && bodyB.Type == BodyType.Static)
             {
-                _jointColorIndices[handle] = -1;
-                _jointLocalIndices[handle] = -1;
+                SetJointConstraintGraphIndex(handle, -1, -1);
                 return;
             }
 
             int colorIndex = _constraintGraph.AssignJointColor(bodyA, bodyB);
             ConstraintGraph.GraphColor color = _constraintGraph.Colors[colorIndex];
-            _jointColorIndices[handle] = colorIndex;
-            _jointLocalIndices[handle] = color.Joints.Count;
+            SetJointConstraintGraphIndex(handle, colorIndex, color.Joints.Count);
             color.Joints.Add(handle);
         }
 
@@ -2970,14 +2955,147 @@ namespace Box2DNG
             return islandId >= 0 && islandId < _lastIslands.Count ? _lastIslands[islandId].Id : 0;
         }
 
+        private void EnsureJointSolverSetCapacity(int capacity)
+        {
+            if (capacity <= _jointSolverSetUsedById.Length)
+            {
+                return;
+            }
+
+            int previousCapacity = _jointSolverSetUsedById.Length;
+            int newCapacity = Math.Max(capacity, Math.Max(256, previousCapacity * 2));
+            Array.Resize(ref _jointSolverSetTypesById, newCapacity);
+            Array.Resize(ref _jointSolverSetIdsById, newCapacity);
+            Array.Resize(ref _jointSolverSetUsedById, newCapacity);
+            Array.Clear(_jointSolverSetTypesById, previousCapacity, newCapacity - previousCapacity);
+            Array.Clear(_jointSolverSetIdsById, previousCapacity, newCapacity - previousCapacity);
+            Array.Clear(_jointSolverSetUsedById, previousCapacity, newCapacity - previousCapacity);
+        }
+
+        private void SetJointSolverSet(JointHandle handle, SolverSetType type, int setId)
+        {
+            int jointId = handle.Id;
+            if (jointId < 0)
+            {
+                return;
+            }
+
+            EnsureJointSolverSetCapacity(jointId + 1);
+            _jointSolverSetTypesById[jointId] = type;
+            _jointSolverSetIdsById[jointId] = setId;
+            _jointSolverSetUsedById[jointId] = true;
+        }
+
+        private void ClearJointSolverSet(JointHandle handle)
+        {
+            int jointId = handle.Id;
+            if ((uint)jointId >= (uint)_jointSolverSetUsedById.Length)
+            {
+                return;
+            }
+
+            _jointSolverSetUsedById[jointId] = false;
+            _jointSolverSetIdsById[jointId] = 0;
+            _jointSolverSetTypesById[jointId] = default;
+        }
+
+        private void ClearJointSolverSets()
+        {
+            Array.Clear(_jointSolverSetUsedById, 0, _jointSolverSetUsedById.Length);
+            Array.Clear(_jointSolverSetIdsById, 0, _jointSolverSetIdsById.Length);
+            Array.Clear(_jointSolverSetTypesById, 0, _jointSolverSetTypesById.Length);
+        }
+
+        private void EnsureJointConstraintGraphCapacity(int capacity)
+        {
+            if (capacity <= _jointConstraintGraphUsedById.Length)
+            {
+                return;
+            }
+
+            int previousCapacity = _jointConstraintGraphUsedById.Length;
+            int newCapacity = Math.Max(capacity, Math.Max(256, previousCapacity * 2));
+            Array.Resize(ref _jointColorIndicesById, newCapacity);
+            Array.Resize(ref _jointLocalIndicesById, newCapacity);
+            Array.Resize(ref _jointConstraintGraphUsedById, newCapacity);
+            Array.Fill(_jointColorIndicesById, -1, previousCapacity, newCapacity - previousCapacity);
+            Array.Fill(_jointLocalIndicesById, -1, previousCapacity, newCapacity - previousCapacity);
+            Array.Clear(_jointConstraintGraphUsedById, previousCapacity, newCapacity - previousCapacity);
+        }
+
+        private void SetJointConstraintGraphIndex(JointHandle handle, int colorIndex, int localIndex)
+        {
+            int jointId = handle.Id;
+            if (jointId < 0)
+            {
+                return;
+            }
+
+            EnsureJointConstraintGraphCapacity(jointId + 1);
+            _jointColorIndicesById[jointId] = colorIndex;
+            _jointLocalIndicesById[jointId] = localIndex;
+            _jointConstraintGraphUsedById[jointId] = true;
+        }
+
+        private void ClearJointConstraintGraphIndex(JointHandle handle)
+        {
+            int jointId = handle.Id;
+            if ((uint)jointId >= (uint)_jointConstraintGraphUsedById.Length)
+            {
+                return;
+            }
+
+            _jointConstraintGraphUsedById[jointId] = false;
+            _jointColorIndicesById[jointId] = -1;
+            _jointLocalIndicesById[jointId] = -1;
+        }
+
+        private void ClearJointConstraintGraphIndices()
+        {
+            Array.Fill(_jointColorIndicesById, -1);
+            Array.Fill(_jointLocalIndicesById, -1);
+            Array.Clear(_jointConstraintGraphUsedById, 0, _jointConstraintGraphUsedById.Length);
+        }
+
+        private bool TryGetJointConstraintGraphIndex(JointHandle handle, out int colorIndex, out int localIndex)
+        {
+            int jointId = handle.Id;
+            if ((uint)jointId < (uint)_jointConstraintGraphUsedById.Length && _jointConstraintGraphUsedById[jointId])
+            {
+                colorIndex = _jointColorIndicesById[jointId];
+                localIndex = _jointLocalIndicesById[jointId];
+                return true;
+            }
+
+            colorIndex = -1;
+            localIndex = -1;
+            return false;
+        }
+
         internal bool TryGetJointSolverSetType(JointHandle handle, out SolverSetType type)
         {
-            return _jointSolverSetTypes.TryGetValue(handle, out type);
+            int jointId = handle.Id;
+            if ((uint)jointId < (uint)_jointSolverSetUsedById.Length && _jointSolverSetUsedById[jointId])
+            {
+                type = _jointSolverSetTypesById[jointId];
+                return true;
+            }
+
+            type = default;
+            return false;
         }
 
         internal bool TryGetJointSolverSetId(JointHandle handle, out int setId)
         {
-            return _jointSolverSetIds.TryGetValue(handle, out setId);
+            int jointId = handle.Id;
+            if ((uint)jointId < (uint)_jointSolverSetUsedById.Length && _jointSolverSetUsedById[jointId])
+            {
+                setId = _jointSolverSetIdsById[jointId];
+                return true;
+            }
+
+            setId = 0;
+            return false;
         }
 
         private void TryAddContactToSleepingSet(Contact contact, Body bodyA, Body bodyB)
@@ -3040,8 +3158,7 @@ namespace Box2DNG
                 if (!set.Joints.Contains(handle))
                 {
                     set.Joints.Add(handle);
-                    _jointSolverSetTypes[handle] = SolverSetType.Sleeping;
-                    _jointSolverSetIds[handle] = setId;
+                                        SetJointSolverSet(handle, SolverSetType.Sleeping, setId);
                 }
             }
         }
@@ -3172,8 +3289,7 @@ namespace Box2DNG
                     }
                     for (int i = 0; i < secondary.Joints.Count; ++i)
                     {
-                        _jointSolverSetTypes[secondary.Joints[i]] = SolverSetType.Sleeping;
-                        _jointSolverSetIds[secondary.Joints[i]] = primarySetId;
+                                                SetJointSolverSet(secondary.Joints[i], SolverSetType.Sleeping, primarySetId);
                     }
                 }
             }
@@ -3190,8 +3306,7 @@ namespace Box2DNG
                 }
                 for (int i = 0; i < secondary.Joints.Count; ++i)
                 {
-                    _jointSolverSetTypes[secondary.Joints[i]] = SolverSetType.Sleeping;
-                    _jointSolverSetIds[secondary.Joints[i]] = existingPrimarySetId;
+                                        SetJointSolverSet(secondary.Joints[i], SolverSetType.Sleeping, existingPrimarySetId);
                 }
             }
 
@@ -3332,8 +3447,7 @@ namespace Box2DNG
                         _awakeSet.Joints.Add(handle);
                     }
                     _sleepingSet.Joints.Remove(handle);
-                    _jointSolverSetTypes[handle] = SolverSetType.Awake;
-                    _jointSolverSetIds[handle] = 0;
+                                        SetJointSolverSet(handle, SolverSetType.Awake, 0);
                 }
             }
 
@@ -3356,8 +3470,7 @@ namespace Box2DNG
             }
             for (int i = 0; i < set.Joints.Count; ++i)
             {
-                _jointSolverSetTypes[set.Joints[i]] = SolverSetType.Sleeping;
-                _jointSolverSetIds[set.Joints[i]] = setId;
+                                SetJointSolverSet(set.Joints[i], SolverSetType.Sleeping, setId);
             }
         }
 
@@ -3378,14 +3491,13 @@ namespace Box2DNG
             JointHandle handle = new JointHandle(type, jointId);
             _awakeSet.Joints.Remove(handle);
             _sleepingSet.Joints.Remove(handle);
-            _jointSolverSetTypes.Remove(handle);
-            _jointSolverSetIds.Remove(handle);
             RemoveJointFromSleepingSets(handle);
+            ClearJointSolverSet(handle);
         }
 
         private void RemoveJointFromSleepingSets(JointHandle handle)
         {
-            if (_jointSolverSetIds.TryGetValue(handle, out int setId) &&
+            if (TryGetJointSolverSetId(handle, out int setId) &&
                 setId != 0 &&
                 _sleepingIslandSets.TryGetValue(setId, out SolverSet? set))
             {
@@ -3397,6 +3509,19 @@ namespace Box2DNG
             {
                 pair.Value.Joints.Remove(handle);
             }
+        }
+
+        private int FindSleepingSetIdForJoint(JointHandle handle)
+        {
+            foreach (System.Collections.Generic.KeyValuePair<int, SolverSet> pair in _sleepingIslandSets)
+            {
+                if (pair.Value.Joints.Contains(handle))
+                {
+                    return pair.Key;
+                }
+            }
+
+            return 0;
         }
 
         private int GetSleepingSetId(Island island)
@@ -3513,8 +3638,7 @@ namespace Box2DNG
             }
             for (int i = 0; i < island.Joints.Count; ++i)
             {
-                _jointSolverSetTypes[island.Joints[i]] = targetType;
-                _jointSolverSetIds[island.Joints[i]] = targetType == SolverSetType.Awake ? 0 : island.Id;
+                                SetJointSolverSet(island.Joints[i], targetType, targetType == SolverSetType.Awake ? 0 : island.Id);
             }
         }
 
@@ -4647,14 +4771,14 @@ namespace Box2DNG
             for (int i = 0; i < _awakeSet.Joints.Count; ++i)
             {
                 JointHandle handle = _awakeSet.Joints[i];
-                System.Diagnostics.Debug.Assert(_jointSolverSetTypes.TryGetValue(handle, out SolverSetType type) && type == SolverSetType.Awake);
-                System.Diagnostics.Debug.Assert(_jointSolverSetIds.TryGetValue(handle, out int setId) && setId == 0);
+                System.Diagnostics.Debug.Assert(TryGetJointSolverSetType(handle, out SolverSetType type) && type == SolverSetType.Awake);
+                System.Diagnostics.Debug.Assert(TryGetJointSolverSetId(handle, out int setId) && setId == 0);
             }
 
             for (int i = 0; i < _sleepingSet.Joints.Count; ++i)
             {
                 JointHandle handle = _sleepingSet.Joints[i];
-                System.Diagnostics.Debug.Assert(_jointSolverSetTypes.TryGetValue(handle, out SolverSetType type) && type == SolverSetType.Sleeping);
+                System.Diagnostics.Debug.Assert(TryGetJointSolverSetType(handle, out SolverSetType type) && type == SolverSetType.Sleeping);
             }
 
             ValidateIdPoolMembership();
@@ -4822,9 +4946,8 @@ namespace Box2DNG
                 for (int i = 0; i < color.Joints.Count; ++i)
                 {
                     JointHandle handle = color.Joints[i];
-                    System.Diagnostics.Debug.Assert(_jointColorIndices.TryGetValue(handle, out int jointColor));
+                    System.Diagnostics.Debug.Assert(TryGetJointConstraintGraphIndex(handle, out int jointColor, out int localIndex));
                     System.Diagnostics.Debug.Assert(jointColor == colorIndex);
-                    System.Diagnostics.Debug.Assert(_jointLocalIndices.TryGetValue(handle, out int localIndex));
                     System.Diagnostics.Debug.Assert(localIndex == i);
                     if (TryGetJointBodies(handle, out Body bodyA, out Body bodyB))
                     {
@@ -4949,7 +5072,7 @@ namespace Box2DNG
                 for (int j = 0; j < island.Joints.Count; ++j)
                 {
                     JointHandle handle = island.Joints[j];
-                    System.Diagnostics.Debug.Assert(_jointSolverSetTypes.TryGetValue(handle, out SolverSetType type));
+                    System.Diagnostics.Debug.Assert(TryGetJointSolverSetType(handle, out SolverSetType type));
                     if (isAwake)
                     {
                         System.Diagnostics.Debug.Assert(type == SolverSetType.Awake);
@@ -4959,7 +5082,7 @@ namespace Box2DNG
                         System.Diagnostics.Debug.Assert(type == SolverSetType.Sleeping);
                     }
 
-                    if (_jointSolverSetIds.TryGetValue(handle, out int setId))
+                    if (TryGetJointSolverSetId(handle, out int setId))
                     {
                         if (isAwake)
                         {
@@ -6822,3 +6945,6 @@ namespace Box2DNG
         }
     }
 }
+
+
+
